@@ -1,27 +1,61 @@
 import logging
+
 from fastapi import FastAPI, status
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
-from typing import Callable, Awaitable
+
 from src.schemas import ErrorCode, ErrorSchema
 
 logger = logging.getLogger(__name__)
 
 
-class BaseException(Exception):
+class AppException(Exception):
     """Base exception for Raízes do Nordeste API."""
 
-    pass
+    def __init__(self, message: str | None = None, *args: object) -> None:
+        if message is not None:
+            self.message = message
+        super().__init__(*args)
+
+    status_code: int
+    message: str
+    error_code: ErrorCode
 
 
-def create_exception_handler(
-    status_code: int, response: ErrorSchema
-) -> Callable[[Request, Exception], Awaitable[JSONResponse]]:
-    async def exception_handler(_request: Request, _exception: Exception) -> JSONResponse:
-        logger.exception(_exception)
-        return JSONResponse(status_code=status_code, content=response.model_dump())
+def create_exception_handler(exception_class):
+    async def handler(request, exc):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=ErrorSchema(
+                message=exc.message,
+                error_code=exc.error_code,
+            ).model_dump(),
+        )
 
-    return exception_handler
+    return handler
+
+
+def error_responses(*exceptions: type["AppException"]) -> dict:
+    """Generate OpenAPI response documentation for exceptions.
+
+    Usage:
+        responses=error_responses(InsufficientPermissionException, UserAlreadyExistsException)
+    """
+    result = {}
+    for exc in exceptions:
+        result[exc.status_code] = {
+            "model": ErrorSchema,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "message": exc.message,
+                        "error_code": exc.error_code.value,
+                    }
+                }
+            },
+        }
+    return result
 
 
 def register_global_exception_handlers(app: FastAPI):
@@ -33,7 +67,6 @@ def register_global_exception_handlers(app: FastAPI):
         error_content = ErrorSchema(
             message="O recurso solicitado não foi encontrado.",
             error_code=ErrorCode.NOT_FOUND,
-            details=None,
         ).model_dump()
         return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content=error_content)
 
@@ -43,6 +76,5 @@ def register_global_exception_handlers(app: FastAPI):
         error_content = ErrorSchema(
             message="Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde.",
             error_code=ErrorCode.INTERNAL_SERVER_ERROR,
-            details=None,
         ).model_dump()
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content=error_content)

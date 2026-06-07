@@ -1,7 +1,9 @@
-from enum import Enum
-from typing import Optional, TypeVar, Generic, Any
-from pydantic import BaseModel, ConfigDict
 from datetime import datetime
+from enum import Enum
+from typing import Generic, Optional, TypeVar
+
+from pydantic import BaseModel, ConfigDict
+
 from src.utils import datetime_to_gmt_str
 
 T = TypeVar("T")
@@ -19,6 +21,18 @@ class BaseSchema(BaseModel):
 class ErrorCode(str, Enum):
     """Error codes for API responses."""
 
+    USER_NOT_FOUND = "USER_NOT_FOUND"
+    USER_ALREADY_EXISTS = "USER_ALREADY_EXISTS"
+    USER_ALREADY_VERIFIED = "USER_ALREADY_VERIFIED"
+    USER_NOT_VERIFIED = "USER_NOT_VERIFIED"
+    USER_SESSION_EXPIRED = "USER_SESSION_EXPIRED"
+    PASSWORDS_DO_NOT_MATCH = "PASSWORDS_DO_NOT_MATCH"
+    INVALID_CREDENTIALS = "INVALID_CREDENTIALS"
+    INVALID_TOKEN = "INVALID_TOKEN"
+    ACCESS_TOKEN_REQUIRED = "ACCESS_TOKEN_REQUIRED"
+    REFRESH_TOKEN_REQUIRED = "REFRESH_TOKEN_REQUIRED"
+    RESET_TOKEN_INVALID = "RESET_TOKEN_INVALID"
+    UNAUTHORIZED = "UNAUTHORIZED"
     NOT_FOUND = "NOT_FOUND"
     INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR"
 
@@ -41,5 +55,10 @@ class ErrorSchema(ResponseBaseSchema):
     """Default error response schema."""
 
     success: bool = False
-    details: Optional[Any] = None
     error_code: Optional[ErrorCode] = None
+
+
+class HealthCheckSchema(BaseSchema):
+    """Schema for the health check endpoint."""
+
+    status: str = "ok"
