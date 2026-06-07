@@ -2,17 +2,42 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AppConfig(BaseSettings):
+    """Application configuration loaded from environment variables."""
+
+    FRONTEND_URL: str | None = None
+    ENVIRONMENT: str = "development"
+    SECRET_KEY: str = "super-secret-key-change-in-production"
+    FIRST_ADMIN_EMAIL: str = "admin@example.com"
+    FIRST_ADMIN_PASSWORD: str = "admin"
+
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str
 
-    ENVIRONMENT: str = "development"
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_PASSWORD: str
+
+    MAIL_USERNAME: str
+    MAIL_PASSWORD: str
+    MAIL_FROM: str = "email@exemplo.com"
+    MAIL_PORT: int = 1025
+    MAIL_SERVER: str = "localhost"
+    MAIL_FROM_NAME: str = "Raízes do Nordeste"
+    MAIL_STARTTLS: bool = False
+    MAIL_SSL_TLS: bool = False
+    USE_CREDENTIALS: bool = False
+    VALIDATE_CERTS: bool = True
 
     @property
     def DATABASE_URL(self) -> str:
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+    @property
+    def REDIS_URL(self) -> str:
+        return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
