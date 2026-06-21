@@ -16,6 +16,17 @@ from src.units.service import UnitService
 router = APIRouter(prefix="/units", tags=["units"])
 unit_service = UnitService()
 manage_units_role_checker = RoleChecker(allowed_roles=[Role.ADMIN, Role.MANAGER])
+AUTHORIZATION_OPENAPI_EXTRA = {
+    "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "required": True,
+            "description": "The access token to use for authentication.",
+            "schema": {"type": "string", "example": "Bearer eyJhbGciOiJIUzI1NiIs..."},
+        }
+    ]
+}
 
 
 @router.post(
@@ -23,6 +34,7 @@ manage_units_role_checker = RoleChecker(allowed_roles=[Role.ADMIN, Role.MANAGER]
     response_model=SuccessSchema[UnitResponse],
     responses=error_responses(InsufficientPermissionException),
     status_code=status.HTTP_201_CREATED,
+    openapi_extra=AUTHORIZATION_OPENAPI_EXTRA,
 )
 async def create_unit(
     unit_data: UnitCreate,
@@ -34,10 +46,17 @@ async def create_unit(
     return SuccessSchema(message="Unidade criada com sucesso.", result=new_unit)
 
 
-@router.get("/", response_model=SuccessSchema[list[UnitResponse]], status_code=status.HTTP_200_OK)
+@router.get(
+    "/",
+    response_model=SuccessSchema[list[UnitResponse]],
+    responses=error_responses(InsufficientPermissionException),
+    status_code=status.HTTP_200_OK,
+    openapi_extra=AUTHORIZATION_OPENAPI_EXTRA,
+)
 async def list_units(
     include_inactive: bool = Query(default=False, alias="includeInactive"),
     session: AsyncSession = Depends(get_async_session),
+    _current_user: User = Depends(manage_units_role_checker),
 ):
     """List business units."""
     units = await unit_service.list_units(session, include_inactive=include_inactive)
@@ -47,10 +66,15 @@ async def list_units(
 @router.get(
     "/{unit_id}",
     response_model=SuccessSchema[UnitResponse],
-    responses=error_responses(UnitNotFoundException),
+    responses=error_responses(InsufficientPermissionException, UnitNotFoundException),
     status_code=status.HTTP_200_OK,
+    openapi_extra=AUTHORIZATION_OPENAPI_EXTRA,
 )
-async def get_unit(unit_id: uuid.UUID, session: AsyncSession = Depends(get_async_session)):
+async def get_unit(
+    unit_id: uuid.UUID,
+    session: AsyncSession = Depends(get_async_session),
+    _current_user: User = Depends(manage_units_role_checker),
+):
     """Get a business unit by id."""
     unit = await unit_service.get_unit_by_id(unit_id, session)
     if not unit:
@@ -63,6 +87,7 @@ async def get_unit(unit_id: uuid.UUID, session: AsyncSession = Depends(get_async
     response_model=SuccessSchema[UnitResponse],
     responses=error_responses(InsufficientPermissionException, UnitNotFoundException),
     status_code=status.HTTP_200_OK,
+    openapi_extra=AUTHORIZATION_OPENAPI_EXTRA,
 )
 async def update_unit(
     unit_id: uuid.UUID,
@@ -83,6 +108,7 @@ async def update_unit(
     response_model=SuccessSchema[UnitResponse],
     responses=error_responses(InsufficientPermissionException, UnitNotFoundException),
     status_code=status.HTTP_200_OK,
+    openapi_extra=AUTHORIZATION_OPENAPI_EXTRA,
 )
 async def deactivate_unit(
     unit_id: uuid.UUID,
