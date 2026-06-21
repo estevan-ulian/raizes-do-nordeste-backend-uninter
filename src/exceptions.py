@@ -61,6 +61,15 @@ def error_responses(*exceptions: type["AppException"]) -> dict:
 def register_global_exception_handlers(app: FastAPI):
     """Registers global exception handlers for the FastAPI app."""
 
+    @app.exception_handler(401)
+    async def _not_authorized_exception_handler(_request: Request, _exception: Exception) -> JSONResponse:
+        logger.exception(_exception)
+        error_content = ErrorSchema(
+            message="Você precisa estar autenticado para acessar este recurso.",
+            error_code=ErrorCode.UNAUTHORIZED,
+        ).model_dump()
+        return JSONResponse(content=error_content, status_code=status.HTTP_401_UNAUTHORIZED)
+
     @app.exception_handler(404)
     async def _not_found_exception_handler(_request: Request, _exception: Exception) -> JSONResponse:
         logger.exception(_exception)
