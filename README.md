@@ -133,14 +133,15 @@ Use os dados do `.env` para acessar o PostgreSQL pelo Adminer:
 
 ### Módulo de Unidades
 - [x] Model `Unit`
-- [x] CRUD endpoints em `/unidades`
+- [x] CRUD endpoints em `/units`
 - [x] Permissões de gerenciamento para ADMIN/MANAGER
 
 ### Módulo de Produtos/Cardápio
 - [x] Model `Product`
-- [ ] CRUD endpoints em `/produtos`
-- [ ] Listagem de cardápio por unidade
-- [ ] Paginação e filtros aplicáveis
+- [x] CRUD endpoints em `/products`
+- [x] Listagem de cardápio por unidade
+- [x] Paginação e filtros aplicáveis
+- [x] Upload local de imagem via `multipart/form-data` e persistência em `image_url`
 
 ### Módulo de Estoque
 - [x] Model `Inventory`
