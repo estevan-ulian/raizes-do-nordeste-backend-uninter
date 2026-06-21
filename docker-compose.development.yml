@@ -52,7 +52,7 @@ services:
       - raizes_network
   mail-box:
     image: maildev/maildev
-    restart: always
+    restart: unless-stopped
     environment:
       - TZ=America/Sao_Paulo
       - MAILDEV_WEB_PORT=1080

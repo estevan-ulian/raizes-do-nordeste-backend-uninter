@@ -177,7 +177,7 @@ pyrightconfig.json
 
 # Miscellaneous
 .serena
-.temp
+temp
 
 # Celery
 celerybeat-schedule
