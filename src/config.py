@@ -1,4 +1,8 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class AppConfig(BaseSettings):
@@ -30,6 +34,16 @@ class AppConfig(BaseSettings):
     MAIL_SSL_TLS: bool = False
     USE_CREDENTIALS: bool = False
     VALIDATE_CERTS: bool = True
+
+    UPLOAD_DIR: str = "static/uploads"
+    UPLOAD_PUBLIC_URL: str = "/uploads"
+
+    @property
+    def UPLOAD_PATH(self) -> Path:
+        upload_path = Path(self.UPLOAD_DIR)
+        if not upload_path.is_absolute():
+            upload_path = BASE_DIR / upload_path
+        return upload_path
 
     @property
     def DATABASE_URL(self) -> str:
