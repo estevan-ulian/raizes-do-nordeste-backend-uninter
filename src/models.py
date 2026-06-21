@@ -1,0 +1,13 @@
+from src.audit.models import AuditLog as AuditLog
+from src.auth.models import User as User
+from src.inventory.models import Inventory as Inventory
+from src.loyalty.models import LoyaltyAccount as LoyaltyAccount
+from src.loyalty.models import LoyaltyRedemption as LoyaltyRedemption
+from src.orders.models import Order as Order
+from src.orders.models import OrderItem as OrderItem
+from src.payments.models import Payment as Payment
+from src.privacy.models import LGPDConsent as LGPDConsent
+from src.products.models import Product as Product
+from src.promotions.models import OrderPromotion as OrderPromotion
+from src.promotions.models import Promotion as Promotion
+from src.units.models import Unit as Unit

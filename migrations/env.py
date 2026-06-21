@@ -21,6 +21,16 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 from src.auth.models import User
+from src.audit.models import AuditLog
+from src.inventory.models import Inventory
+from src.loyalty.models import LoyaltyAccount, LoyaltyRedemption
+from src.orders.models import Order, OrderItem
+from src.payments.models import Payment
+from src.privacy.models import LGPDConsent
+from src.products.models import Product
+from src.promotions.models import OrderPromotion, Promotion
+from src.units.models import Unit
+
 target_metadata = SQLModel.metadata
 
 # other values from the config, defined by the needs of env.py,

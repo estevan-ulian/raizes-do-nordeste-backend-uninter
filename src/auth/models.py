@@ -1,12 +1,19 @@
 import uuid
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING, Optional
 
 import sqlalchemy.dialects.postgresql as pg
-from sqlmodel import Column, Field, SQLModel
+from sqlmodel import Column, Field, Relationship, SQLModel
 from sqlmodel import Enum as SQLEnum
 
 from src.utils import get_utc_now
+
+if TYPE_CHECKING:
+    from src.audit.models import AuditLog
+    from src.loyalty.models import LoyaltyAccount
+    from src.orders.models import Order
+    from src.privacy.models import LGPDConsent
 
 
 class Role(str, Enum):
@@ -29,3 +36,8 @@ class User(SQLModel, table=True):
     is_verified: bool = Field(default=False)
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP(timezone=True), default=get_utc_now))
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP(timezone=True), default=get_utc_now))
+
+    orders: list["Order"] = Relationship(back_populates="customer")
+    loyalty_account: Optional["LoyaltyAccount"] = Relationship(back_populates="customer")
+    lgpd_consents: list["LGPDConsent"] = Relationship(back_populates="user")
+    audit_logs: list["AuditLog"] = Relationship(back_populates="user")
