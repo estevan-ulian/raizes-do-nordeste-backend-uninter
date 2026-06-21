@@ -1,5 +1,100 @@
 # Raizes do Nordeste - Backend
 
+## Requisitos
+
+- Python 3.13+
+- [uv](https://docs.astral.sh/uv/)
+- [Docker](https://www.docker.com/products/docker-desktop)
+- [Make](https://www.gnu.org/software/make/manual)
+
+## Stack
+
+- **FastAPI:** framework web usado para expor a API HTTP.
+- **FastAPI Mail:** envio de e-mails da aplicação.
+- **SQLModel:** modelagem das entidades e integração com SQLAlchemy.
+- **PostgreSQL:** banco de dados relacional da aplicação.
+- **Alembic:** controle e execução de migrations do banco.
+- **Redis:** backend usado para blocklist de tokens e broker/result backend do Celery.
+- **Celery:** processamento de tarefas em segundo plano.
+- **Flower:** painel web opcional para monitorar workers e tarefas do Celery.
+- **Pydantic Settings:** carregamento e validação das variáveis de ambiente.
+- **Ruff:** lint e formatação de código.
+
+## Instalação
+
+1. Clone este repositório
+```bash
+git clone https://github.com/estevan-ulian/raizes-do-nordeste-backend-uninter.git
+cd raizes-do-nordeste-backend-uninter
+```
+
+2. Crie/copie o arquivo de variáveis de ambiente
+```bash
+cp .env.example .env
+```
+
+Revise o `.env` antes de subir o projeto, especialmente as portas de PostgreSQL e Redis. O `.env.example` sugere e usa `POSTGRES_PORT=5444` e `REDIS_PORT=6380` para evitar conflito com serviços locais.
+
+## Comandos
+
+### Principais
+
+Sobe os containers de desenvolvimento (PostgreSQL, Redis, MailDev, Adminer):
+```bash
+make docker-up
+```
+
+Roda as migrations e inicia a API:
+```bash
+make api-dev
+```
+
+Worker para executar tarefas em segundo plano:
+```bash
+make api-worker
+```
+
+### Outros comandos úteis
+
+```bash
+make help                               # Lista todos os comandos disponíveis
+make api-create-migration m="descricao" # Cria uma nova migration
+make api-migration                      # Executa migrations pendentes
+make api-worker-beat                    # Inicializa o Celery Beat
+make api-worker-ui                      # Inicializa o Celery UI
+make docker-logs                        # Mostra logs dos containers
+make docker-down                        # Para todos containers
+make docker-down-clean                  # Para containers e remove volumes
+```
+
+> O comando `make docker-down-clean` remove os volumes do Docker, apagando todos os dados salvos no PostgreSQL e Redis.
+
+## Acesso
+
+- **API:** http://localhost:8000/api
+- **Swagger:** http://localhost:8000/api/docs
+- **ReDoc:** http://localhost:8000/api/redoc
+- **MailDev:** http://localhost:1080
+- **Adminer:** http://localhost:9192
+
+### Worker UI
+Para visualizar os agendamentos e execução das tarefas em segundo plano, rode o comando:
+```bash
+make api-worker-ui
+```
+- **Worker UI:** http://localhost:5555
+
+### Adminer
+
+Use os dados do `.env` para acessar o PostgreSQL pelo Adminer:
+
+- **Sistema:** PostgreSQL
+- **Servidor:** `database`
+- **Usuário:** `POSTGRES_USER`
+- **Senha:** `POSTGRES_PASSWORD`
+- **Base:** `POSTGRES_DB`
+
+
 ## ToDo
 
 ### Infraestrutura e Configuração
@@ -8,6 +103,8 @@
 - [x] Sistema de variáveis de ambiente (.env e .env.example)
 - [x] Configuração Ruff (linting e formatação)
 - [x] Makefile com comandos de execução do projeto
+- [x] Seeder do primeiro usuário administrador
+- [ ] Seeds de desenvolvimento para unidade, produtos, estoque e usuários de teste
 
 ### Autenticação e Segurança
 - [x] Sistema de autenticação JWT (access + refresh tokens)
@@ -17,31 +114,90 @@
 - [x] Hash de senha com bcrypt
 - [x] Token blocklist com Redis
 - [x] Sistema de roles (ADMIN, MANAGER, KITCHEN, SERVER, CUSTOMER)
+- [x] Dependência para autorização por perfil (`RoleChecker`)
 - [x] Middleware CORS
-- [x] Admin seeder (primeiro usuário administrador)
+- [x] Tratamento padronizado de erros globais e de autenticação
 - [ ] Rate limiting
-- [ ] Validação LGPD
+
+### Modelagem e Arquitetura
+- [x] [Diagrama Entidade-Relacionamento](docs/DER.md)
+- [x] [Diagrama de Casos de Uso](docs/USE_CASES.md)
+- [x] [Diagrama de Classes](docs/CLASSES.md)
+- [x] [Diagrama de sequência do fluxo](docs/FLOW.md)
+- [x] [Diagrama de arquitetura por camadas](docs/ARCHITECTURE.md)
+- [x] Models de domínio criados com SQLModel
+- [x] Relationships dos models implementados conforme DER
+- [x] Migration dos models de negócio criada
+- [ ] Revisar coerência final entre diagramas, enums, migrations, endpoints e regras implementadas
+- [ ] Descrever feature crítica com pré-condições, pós-condições, exceções e regras de negócio
 
 ### Módulo de Unidades
-- [ ] À definir...
+- [x] Model `Unit`
+- [ ] CRUD endpoints em `/unidades`
+- [ ] Permissões de gerenciamento para ADMIN/MANAGER
 
 ### Módulo de Produtos/Cardápio
-- [ ] À definir...
+- [x] Model `Product`
+- [ ] CRUD endpoints em `/produtos`
+- [ ] Listagem de cardápio por unidade
+- [ ] Paginação e filtros aplicáveis
 
 ### Módulo de Estoque
-- [ ] À definir...
+- [x] Model `Inventory`
+- [x] Migration da tabela `inventory`
+- [x] Restrição única por unidade/produto
+- [ ] Entrada e saída de estoque por unidade
+- [ ] Consulta de saldo por unidade
+- [ ] Bloqueio de venda por estoque insuficiente
 
 ### Módulo de Pedidos
-- [ ] À definir...
+- [x] Models `Order` e `OrderItem`
+- [x] Campo `order_channel` com ENUM APP, TOTEM, BALCAO, PICKUP e WEB
+- [x] Campo `status` alinhado ao DER: WAITING_FOR_PAYMENT, PAID, IN_THE_KITCHEN, READY, DELIVERED, CANCELED
+- [ ] Criar pedido com `canalPedido`
+- [ ] Validar itens do pedido e existência de produto/unidade
+- [ ] Listar/filtrar pedidos por `canalPedido` e `status`
+- [ ] Atualizar status do pedido com transições válidas
+- [ ] Cancelar pedido conforme regra de negócio
 
 ### Módulo de Pagamento (Mock)
-- [ ] À definir...
+- [x] Model `Payment`
+- [x] Relacionamento 1:1 entre pedido e pagamento
+- [x] Campo `status` alinhado ao DER: PENDING, APPROVED, REJECTED
+- [ ] Mock gateway de pagamento
+- [ ] Endpoint `POST /pagamentos`
+- [ ] Aprovar/recusar pagamento mock e atualizar status do pedido
+- [ ] Retornar payload de status ao cliente
 
 ### Módulo de Fidelidade
-- [ ] À definir...
+- [x] Models `LoyaltyAccount` e `LoyaltyRedemption`
+- [x] Conta de fidelidade 1:1 por cliente
+- [ ] Documentar regra de pontos, saldo, resgate simples e consentimento
+- [ ] Endpoints
 
 ### Módulo de Promoções
-- [ ] À definir...
+- [x] Models `Promotion` e `OrderPromotion`
+- [x] Relacionamento de promoções aplicadas ao pedido
+- [ ] Documentar regra de aplicação, restrições e impacto no valor final
+- [ ] Endpoints
 
 ### Logs e Auditoria
-- [ ] À definir...
+- [x] Model `AuditLog`
+- [ ] Registrar ações sensíveis: criação de pedido, mudança de status e pagamento
+- [ ] Definir política para logs sem usuário autenticado
+- [ ] Documentar formato e consulta de logs
+
+### LGPD e Privacidade
+- [x] Model `LGPDConsent`
+- [ ] Consentimento no cadastro de cliente
+- [ ] Documentar finalidade e base legal
+- [ ] Documentar minimização de dados pessoais
+- [ ] Documentar retenção, exclusão ou anonimização
+
+### API, Contratos e Testes
+- [ ] Documentar endpoints
+- [ ] Definir contrato por endpoint: método, path, auth/permissões, params, body, response, status codes e exemplo JSON
+- [ ] Padronizar paginação com `page` e `limit` nas listagens
+- [ ] Criar coleção Postman/Insomnia com fluxo principal
+- [ ] Criar plano de testes com pelo menos 10 cenários
+- [ ] Documentar ordem de execução dos testes e evidências
