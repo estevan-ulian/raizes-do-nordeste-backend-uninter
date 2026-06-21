@@ -8,6 +8,7 @@ from src.config import config
 from src.exceptions import register_global_exception_handlers
 from src.middlewares import register_middlewares
 from src.on_startup import create_first_admin_if_not_exists
+from src.units.exceptions import register_units_exception_handlers
 
 
 @asynccontextmanager
@@ -37,6 +38,7 @@ app = FastAPI(**fastapi_config)
 
 register_global_exception_handlers(app)
 register_auth_exception_handlers(app)
+register_units_exception_handlers(app)
 
 register_middlewares(app)
 
