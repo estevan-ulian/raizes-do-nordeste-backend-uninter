@@ -4,7 +4,9 @@ from decimal import Decimal
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.audit.service import AuditAction, audit_service
 from src.auth.models import User
+from src.loyalty.service import loyalty_service
 from src.orders.models import OrderStatus
 from src.orders.service import OrderService
 from src.payments.exceptions import PaymentAlreadyExistsException, PaymentInvalidException
@@ -18,7 +20,12 @@ class PaymentService:
         self.order_service = OrderService()
 
     async def request_mock_payment(
-        self, payment_data: PaymentCreate, current_user: User, session: AsyncSession
+        self,
+        payment_data: PaymentCreate,
+        current_user: User,
+        session: AsyncSession,
+        actor_id: uuid.UUID | None = None,
+        ip: str | None = None,
     ) -> Payment:
         order = await self.order_service.get_order_by_id(payment_data.order_id, session)
         if not order:
@@ -49,6 +56,25 @@ class PaymentService:
         session.add(payment)
         if payment_status == PaymentStatus.APPROVED:
             await self.order_service.mark_order_paid(order, session)
+        await session.flush()
+        await audit_service.register(
+            session,
+            action=AuditAction.PAYMENT_PROCESSED,
+            resource="payment",
+            resource_id=payment.id,
+            user_id=actor_id or current_user.id,
+            details={
+                "order_id": str(order.id),
+                "status": payment_status.value,
+                "method": payment_data.method,
+                "amount": str(order.total_amount),
+            },
+            ip=ip,
+        )
+        if payment_status == PaymentStatus.APPROVED:
+            await loyalty_service.add_points(
+                order.customer_id, order.total_amount, session
+            )
         await session.commit()
         await session.refresh(payment)
         return payment

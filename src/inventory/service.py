@@ -3,6 +3,7 @@ import uuid
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.audit.service import AuditAction, audit_service
 from src.inventory.exceptions import InventoryInsufficientException, InventoryNotFoundException
 from src.inventory.models import Inventory
 from src.inventory.schemas import InventoryMovementCreate, InventoryMovementType
@@ -14,6 +15,8 @@ class InventoryService:
         self,
         movement_data: InventoryMovementCreate,
         session: AsyncSession,
+        actor_id: uuid.UUID | None = None,
+        ip: str | None = None,
     ) -> Inventory:
         inventory_item = await self.get_inventory_item(
             movement_data.unit_id,
@@ -22,6 +25,7 @@ class InventoryService:
             lock=True,
         )
 
+        previous_quantity: int | None = None
         if movement_data.movement_type == InventoryMovementType.ENTRY:
             if inventory_item is None:
                 inventory_item = Inventory(
@@ -31,10 +35,13 @@ class InventoryService:
                     minimum_quantity=movement_data.minimum_quantity or 0,
                 )
                 session.add(inventory_item)
+            else:
+                previous_quantity = inventory_item.quantity
             inventory_item.quantity += movement_data.quantity
         else:
             if inventory_item is None:
                 raise InventoryNotFoundException()
+            previous_quantity = inventory_item.quantity
             if inventory_item.quantity < movement_data.quantity:
                 raise InventoryInsufficientException()
             inventory_item.quantity -= movement_data.quantity
@@ -42,6 +49,23 @@ class InventoryService:
         if movement_data.minimum_quantity is not None:
             inventory_item.minimum_quantity = movement_data.minimum_quantity
         inventory_item.updated_at = get_utc_now()
+        await session.flush()
+        await audit_service.register(
+            session,
+            action=AuditAction.INVENTORY_MOVEMENT_APPLIED,
+            resource="inventory",
+            resource_id=inventory_item.id,
+            user_id=actor_id,
+            details={
+                "unit_id": str(movement_data.unit_id),
+                "product_id": str(movement_data.product_id),
+                "movement_type": movement_data.movement_type.value,
+                "quantity": movement_data.quantity,
+                "previous_quantity": previous_quantity,
+                "new_quantity": inventory_item.quantity,
+            },
+            ip=ip,
+        )
         await session.commit()
         await session.refresh(inventory_item)
         return inventory_item

@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.auth.dependencies import RoleChecker
@@ -50,11 +50,15 @@ AUTHORIZATION_OPENAPI_EXTRA = {
 )
 async def create_order(
     order_data: OrderCreate,
+    request: Request,
     session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(create_order_role_checker),
 ):
     """Create an order with items and an origin channel."""
-    order = await order_service.create_order(order_data, current_user, session)
+    ip = request.client.host if request.client else None
+    order = await order_service.create_order(
+        order_data, current_user, session, actor_id=current_user.id, ip=ip
+    )
     return SuccessSchema(message="Pedido criado com sucesso.", result=order)
 
 
@@ -118,11 +122,15 @@ async def get_order(
 async def update_order_status(
     order_id: uuid.UUID,
     status_data: OrderStatusUpdate,
+    request: Request,
     session: AsyncSession = Depends(get_async_session),
-    _current_user: User = Depends(manage_order_role_checker),
+    current_user: User = Depends(manage_order_role_checker),
 ):
     """Update an order status following the allowed transitions."""
-    order = await order_service.update_order_status(order_id, status_data.status, session)
+    ip = request.client.host if request.client else None
+    order = await order_service.update_order_status(
+        order_id, status_data.status, session, actor_id=current_user.id, ip=ip
+    )
     return SuccessSchema(message="Status do pedido atualizado com sucesso.", result=order)
 
 
@@ -138,6 +146,7 @@ async def update_order_status(
 async def cancel_order(
     order_id: uuid.UUID,
     _cancel_data: OrderCancel,
+    request: Request,
     session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(create_order_role_checker),
 ):
@@ -146,5 +155,6 @@ async def cancel_order(
     if not order_to_cancel:
         raise OrderNotFoundException()
     order_service.ensure_customer_owns_order(current_user, order_to_cancel)
-    order = await order_service.cancel_order(order_id, session)
+    ip = request.client.host if request.client else None
+    order = await order_service.cancel_order(order_id, session, actor_id=current_user.id, ip=ip)
     return SuccessSchema(message="Pedido cancelado com sucesso.", result=order)

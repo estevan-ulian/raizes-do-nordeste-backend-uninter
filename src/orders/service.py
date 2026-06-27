@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.audit.service import AuditAction, audit_service
 from src.auth.models import Role, User
 from src.inventory.models import Inventory
 from src.orders.exceptions import (
@@ -33,7 +34,12 @@ VALID_STATUS_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
 
 class OrderService:
     async def create_order(
-        self, order_data: OrderCreate, current_user: User, session: AsyncSession
+        self,
+        order_data: OrderCreate,
+        current_user: User,
+        session: AsyncSession,
+        actor_id: uuid.UUID | None = None,
+        ip: str | None = None,
     ) -> OrderResponse:
         customer_id = order_data.customer_id or current_user.id
         if current_user.role == Role.CUSTOMER and customer_id != current_user.id:
@@ -83,6 +89,21 @@ class OrderService:
         )
         order.items = order_items
         session.add(order)
+        await session.flush()
+        await audit_service.register(
+            session,
+            action=AuditAction.ORDER_CREATED,
+            resource="order",
+            resource_id=order.id,
+            user_id=actor_id or current_user.id,
+            details={
+                "customer_id": str(customer_id),
+                "unit_id": str(unit.id),
+                "order_channel": order_data.order_channel.value,
+                "total_amount": str(total_amount),
+            },
+            ip=ip,
+        )
         await session.commit()
         return await self.get_order_response(order.id, session)
 
@@ -135,15 +156,34 @@ class OrderService:
         return result.one_or_none()
 
     async def update_order_status(
-        self, order_id: uuid.UUID, new_status: OrderStatus, session: AsyncSession
+        self,
+        order_id: uuid.UUID,
+        new_status: OrderStatus,
+        session: AsyncSession,
+        actor_id: uuid.UUID | None = None,
+        ip: str | None = None,
     ) -> OrderResponse:
         order = await self.get_order_by_id(order_id, session)
         if not order:
             raise OrderNotFoundException()
         if new_status not in VALID_STATUS_TRANSITIONS[order.status]:
             raise OrderStatusInvalidException()
+        previous_status = order.status
         order.status = new_status
         order.updated_at = get_utc_now()
+        await session.flush()
+        await audit_service.register(
+            session,
+            action=AuditAction.ORDER_STATUS_UPDATED,
+            resource="order",
+            resource_id=order.id,
+            user_id=actor_id,
+            details={
+                "previous_status": previous_status.value,
+                "new_status": new_status.value,
+            },
+            ip=ip,
+        )
         await session.commit()
         return await self.get_order_response(order.id, session)
 
@@ -154,14 +194,31 @@ class OrderService:
         order.updated_at = get_utc_now()
         session.add(order)
 
-    async def cancel_order(self, order_id: uuid.UUID, session: AsyncSession) -> OrderResponse:
+    async def cancel_order(
+        self,
+        order_id: uuid.UUID,
+        session: AsyncSession,
+        actor_id: uuid.UUID | None = None,
+        ip: str | None = None,
+    ) -> OrderResponse:
         order = await self.get_order_by_id(order_id, session)
         if not order:
             raise OrderNotFoundException()
         if OrderStatus.CANCELED not in VALID_STATUS_TRANSITIONS[order.status]:
             raise OrderCannotBeCanceledException()
+        previous_status = order.status
         order.status = OrderStatus.CANCELED
         order.updated_at = get_utc_now()
+        await session.flush()
+        await audit_service.register(
+            session,
+            action=AuditAction.ORDER_CANCELED,
+            resource="order",
+            resource_id=order.id,
+            user_id=actor_id,
+            details={"previous_status": previous_status.value},
+            ip=ip,
+        )
         await session.commit()
         return await self.get_order_response(order.id, session)
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.auth.dependencies import RoleChecker
@@ -42,9 +42,13 @@ AUTHORIZATION_OPENAPI_EXTRA = {
 )
 async def request_mock_payment(
     payment_data: PaymentCreate,
+    request: Request,
     session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(payment_role_checker),
 ):
     """Request a mock payment and update the order when approved."""
-    payment = await payment_service.request_mock_payment(payment_data, current_user, session)
+    ip = request.client.host if request.client else None
+    payment = await payment_service.request_mock_payment(
+        payment_data, current_user, session, actor_id=current_user.id, ip=ip
+    )
     return SuccessSchema(message="Pagamento processado com sucesso.", result=payment)

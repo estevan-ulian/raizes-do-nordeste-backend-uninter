@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.auth.dependencies import RoleChecker
@@ -50,12 +50,16 @@ AUTHORIZATION_OPENAPI_EXTRA = {
 )
 async def apply_inventory_movement(
     movement_data: InventoryMovementCreate,
+    request: Request,
     session: AsyncSession = Depends(get_async_session),
-    _current_user: User = Depends(manage_inventory_role_checker),
+    current_user: User = Depends(manage_inventory_role_checker),
 ):
     """Apply an inventory entry or exit movement."""
     await ensure_unit_and_product_match(movement_data.unit_id, movement_data.product_id, session)
-    inventory_item = await inventory_service.apply_movement(movement_data, session)
+    ip = request.client.host if request.client else None
+    inventory_item = await inventory_service.apply_movement(
+        movement_data, session, actor_id=current_user.id, ip=ip
+    )
     return SuccessSchema(message="Movimentação de estoque registrada com sucesso.", result=inventory_item)
 
 
