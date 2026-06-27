@@ -18,9 +18,7 @@ MARKETING_LOYALTY_PURPOSE = "MARKETING_AND_LOYALTY"
 class LoyaltyService:
     """Minimal loyalty service: accumulate points on approved payments."""
 
-    async def get_or_create_account(
-        self, customer_id: uuid.UUID, session: AsyncSession
-    ) -> LoyaltyAccount:
+    async def get_or_create_account(self, customer_id: uuid.UUID, session: AsyncSession) -> LoyaltyAccount:
         account = await self.get_account(customer_id, session)
         if account is not None:
             return account
@@ -34,9 +32,7 @@ class LoyaltyService:
         await session.flush()
         return account
 
-    async def get_account(
-        self, customer_id: uuid.UUID, session: AsyncSession
-    ) -> LoyaltyAccount | None:
+    async def get_account(self, customer_id: uuid.UUID, session: AsyncSession) -> LoyaltyAccount | None:
         statement = select(LoyaltyAccount).where(LoyaltyAccount.customer_id == customer_id)
         result = await session.exec(statement)
         return result.one_or_none()
@@ -86,9 +82,7 @@ class LoyaltyService:
         await session.refresh(redemption)
         return redemption
 
-    async def _has_marketing_consent(
-        self, customer_id: uuid.UUID, session: AsyncSession
-    ) -> bool:
+    async def _has_marketing_consent(self, customer_id: uuid.UUID, session: AsyncSession) -> bool:
         statement = select(LGPDConsent).where(
             LGPDConsent.user_id == customer_id,
             LGPDConsent.purpose == MARKETING_LOYALTY_PURPOSE,

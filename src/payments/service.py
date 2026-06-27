@@ -72,9 +72,7 @@ class PaymentService:
             ip=ip,
         )
         if payment_status == PaymentStatus.APPROVED:
-            await loyalty_service.add_points(
-                order.customer_id, order.total_amount, session
-            )
+            await loyalty_service.add_points(order.customer_id, order.total_amount, session)
         await session.commit()
         await session.refresh(payment)
         return payment
