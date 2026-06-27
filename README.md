@@ -155,20 +155,23 @@ Use os dados do `.env` para acessar o PostgreSQL pelo Adminer:
 - [x] Models `Order` e `OrderItem`
 - [x] Campo `order_channel` com ENUM APP, TOTEM, COUNTER, PICKUP e WEB
 - [x] Campo `status` alinhado ao DER: WAITING_FOR_PAYMENT, PAID, IN_THE_KITCHEN, READY, DELIVERED, CANCELED
-- [ ] Criar pedido com `canalPedido`
-- [ ] Validar itens do pedido e existência de produto/unidade
-- [ ] Listar/filtrar pedidos por `canalPedido` e `status`
-- [ ] Atualizar status do pedido com transições válidas
-- [ ] Cancelar pedido conforme regra de negócio
+- [x] Criar pedido com `canalPedido`
+- [x] Validar itens do pedido e existência de produto/unidade
+- [x] Listar/filtrar pedidos por `canalPedido` e `status`
+- [x] Atualizar status do pedido com transições válidas
+- [x] Cancelar pedido conforme regra de negócio
+- [x] CRUD endpoints em `/orders`
+- [x] Validação de transições de status
 
 ### Módulo de Pagamento (Mock)
 - [x] Model `Payment`
 - [x] Relacionamento 1:1 entre pedido e pagamento
 - [x] Campo `status` alinhado ao DER: PENDING, APPROVED, REJECTED
-- [ ] Mock gateway de pagamento
-- [ ] Endpoint `POST /pagamentos`
-- [ ] Aprovar/recusar pagamento mock e atualizar status do pedido
-- [ ] Retornar payload de status ao cliente
+- [x] Mock gateway de pagamento
+- [x] Endpoint `POST /payments`
+- [x] Aprovar/recusar pagamento mock e atualizar status do pedido
+- [x] Retornar payload de status ao cliente
+- [x] Integração com OrderService para marcar pedido como pago
 
 ### Módulo de Fidelidade
 - [x] Models `LoyaltyAccount` e `LoyaltyRedemption`
