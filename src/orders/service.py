@@ -6,10 +6,12 @@ from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.auth.models import Role, User
+from src.inventory.models import Inventory
 from src.orders.exceptions import (
     OrderCannotBeCanceledException,
     OrderItemInvalidException,
     OrderNotFoundException,
+    OrderStockInsufficientException,
     OrderStatusInvalidException,
 )
 from src.orders.models import Order, OrderChannel, OrderItem, OrderStatus
@@ -52,10 +54,12 @@ class OrderService:
 
         order_items: list[OrderItem] = []
         total_amount = Decimal("0.00")
+        required_quantities: dict[uuid.UUID, int] = {}
         for item in order_data.items:
             product = products_by_id[item.product_id]
             if product.unit_id != unit.id:
                 raise OrderItemInvalidException()
+            required_quantities[product.id] = required_quantities.get(product.id, 0) + item.quantity
             subtotal = product.price * item.quantity
             total_amount += subtotal
             order_items.append(
@@ -66,6 +70,8 @@ class OrderService:
                     subtotal=subtotal,
                 )
             )
+
+        await self._debit_inventory(unit.id, required_quantities, session)
 
         order = Order(
             customer_id=customer_id,
@@ -179,6 +185,35 @@ class OrderService:
         statement = select(Product).where(Product.id.in_(product_ids), Product.is_active)
         result = await session.exec(statement)
         return list(result.all())
+
+    async def _debit_inventory(
+        self,
+        unit_id: uuid.UUID,
+        required_quantities: dict[uuid.UUID, int],
+        session: AsyncSession,
+    ) -> None:
+        statement = (
+            select(Inventory)
+            .where(
+                Inventory.unit_id == unit_id,
+                Inventory.product_id.in_(list(required_quantities.keys())),
+            )
+            .with_for_update()
+        )
+        result = await session.exec(statement)
+        inventory_items = list(result.all())
+        inventory_by_product_id = {item.product_id: item for item in inventory_items}
+
+        for product_id, required_quantity in required_quantities.items():
+            inventory_item = inventory_by_product_id.get(product_id)
+            if inventory_item is None or inventory_item.quantity < required_quantity:
+                raise OrderStockInsufficientException()
+
+        for product_id, required_quantity in required_quantities.items():
+            inventory_item = inventory_by_product_id[product_id]
+            inventory_item.quantity -= required_quantity
+            inventory_item.updated_at = get_utc_now()
+            session.add(inventory_item)
 
     def _to_response(self, order: Order) -> OrderResponse:
         return OrderResponse(

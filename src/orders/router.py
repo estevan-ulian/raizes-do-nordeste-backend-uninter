@@ -12,6 +12,7 @@ from src.orders.exceptions import (
     OrderCannotBeCanceledException,
     OrderItemInvalidException,
     OrderNotFoundException,
+    OrderStockInsufficientException,
     OrderStatusInvalidException,
 )
 from src.orders.models import OrderChannel, OrderStatus
@@ -39,7 +40,11 @@ AUTHORIZATION_OPENAPI_EXTRA = {
 @router.post(
     "/",
     response_model=SuccessSchema[OrderResponse],
-    responses=error_responses(InsufficientPermissionException, OrderItemInvalidException),
+    responses=error_responses(
+        InsufficientPermissionException,
+        OrderItemInvalidException,
+        OrderStockInsufficientException,
+    ),
     status_code=status.HTTP_201_CREATED,
     openapi_extra=AUTHORIZATION_OPENAPI_EXTRA,
 )

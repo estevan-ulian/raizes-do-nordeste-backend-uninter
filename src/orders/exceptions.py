@@ -20,6 +20,14 @@ class OrderItemInvalidException(AppException):
     error_code = ErrorCode.ORDER_ITEM_INVALID
 
 
+class OrderStockInsufficientException(AppException):
+    """Order cannot be created because inventory is insufficient."""
+
+    status_code = status.HTTP_409_CONFLICT
+    message = "Estoque insuficiente para um ou mais itens do pedido."
+    error_code = ErrorCode.ORDER_STOCK_INSUFFICIENT
+
+
 class OrderStatusInvalidException(AppException):
     """Order status transition is invalid."""
 
@@ -42,6 +50,7 @@ def register_orders_exception_handlers(app: FastAPI):
         OrderCannotBeCanceledException,
         OrderItemInvalidException,
         OrderNotFoundException,
+        OrderStockInsufficientException,
         OrderStatusInvalidException,
     ]
     for exc_class in exceptions:
