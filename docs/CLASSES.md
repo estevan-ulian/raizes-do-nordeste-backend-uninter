@@ -152,7 +152,7 @@ classDiagram
         <<enumeration>>
         APP
         TOTEM
-        BALCAO
+        COUNTER
         PICKUP
         WEB
     }

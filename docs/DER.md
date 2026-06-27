@@ -50,7 +50,7 @@ erDiagram
         uuid id PK
         uuid customer_id FK
         uuid unit_id FK
-        enum order_channel "APP|TOTEM|BALCAO|PICKUP|WEB"
+        enum order_channel "APP|TOTEM|COUNTER|PICKUP|WEB"
         enum status "WAITING_FOR_PAYMENT|PAID|IN_THE_KITCHEN|READY|DELIVERED|CANCELED"
         decimal total_amount
         text notes

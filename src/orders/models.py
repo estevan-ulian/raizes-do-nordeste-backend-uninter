@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 class OrderChannel(str, Enum):
     APP = "APP"
     TOTEM = "TOTEM"
-    BALCAO = "BALCAO"
+    COUNTER = "COUNTER"
     PICKUP = "PICKUP"
     WEB = "WEB"
 

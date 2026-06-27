@@ -86,7 +86,7 @@ def upgrade() -> None:
     sa.Column('unit_id', sa.Uuid(), nullable=False),
     sa.Column(
         'order_channel',
-        sa.Enum('APP', 'TOTEM', 'BALCAO', 'PICKUP', 'WEB', name='orderchannel'),
+        sa.Enum('APP', 'TOTEM', 'COUNTER', 'PICKUP', 'WEB', name='orderchannel'),
         nullable=False,
     ),
     sa.Column(

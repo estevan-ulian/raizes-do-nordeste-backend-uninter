@@ -153,7 +153,7 @@ Use os dados do `.env` para acessar o PostgreSQL pelo Adminer:
 
 ### Módulo de Pedidos
 - [x] Models `Order` e `OrderItem`
-- [x] Campo `order_channel` com ENUM APP, TOTEM, BALCAO, PICKUP e WEB
+- [x] Campo `order_channel` com ENUM APP, TOTEM, COUNTER, PICKUP e WEB
 - [x] Campo `status` alinhado ao DER: WAITING_FOR_PAYMENT, PAID, IN_THE_KITCHEN, READY, DELIVERED, CANCELED
 - [ ] Criar pedido com `canalPedido`
 - [ ] Validar itens do pedido e existência de produto/unidade
