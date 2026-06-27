@@ -203,5 +203,5 @@ Use os dados do `.env` para acessar o PostgreSQL pelo Adminer:
 - [ ] Definir contrato por endpoint: método, path, auth/permissões, params, body, response, status codes e exemplo JSON
 - [ ] Padronizar paginação com `page` e `limit` nas listagens
 - [ ] Criar coleção Postman/Insomnia com fluxo principal
-- [ ] Criar plano de testes com pelo menos 10 cenários
+- [x] [Criar plano de testes com pelo menos 10 cenários](docs/TEST_PLAN.md)
 - [ ] Documentar ordem de execução dos testes e evidências
