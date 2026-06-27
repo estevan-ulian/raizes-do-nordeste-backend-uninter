@@ -1,5 +1,5 @@
 import uuid
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy.orm import selectinload
 from sqlmodel import func, select
@@ -18,6 +18,9 @@ from src.orders.exceptions import (
 from src.orders.models import Order, OrderChannel, OrderItem, OrderStatus
 from src.orders.schemas import OrderCreate, OrderResponse
 from src.products.models import Product
+from src.promotions.exceptions import PromotionNotApplicableException, PromotionNotFoundException
+from src.promotions.models import OrderPromotion
+from src.promotions.service import promotion_service
 from src.units.models import Unit
 from src.utils import get_utc_now
 
@@ -79,15 +82,36 @@ class OrderService:
 
         await self._debit_inventory(unit.id, required_quantities, session)
 
+        applied_promotion = None
+        discount_amount = Decimal("0.00")
+        if order_data.promotion_id:
+            applied_promotion = await promotion_service.get_promotion_by_id(
+                order_data.promotion_id, session
+            )
+            if applied_promotion is None:
+                raise PromotionNotFoundException()
+            if not promotion_service.is_applicable(applied_promotion):
+                raise PromotionNotApplicableException()
+            discount_amount = (
+                total_amount * applied_promotion.discount_percent / Decimal("100")
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
         order = Order(
             customer_id=customer_id,
             unit_id=unit.id,
             order_channel=order_data.order_channel,
             status=OrderStatus.WAITING_FOR_PAYMENT,
-            total_amount=total_amount,
+            total_amount=total_amount - discount_amount,
             notes=order_data.notes,
         )
         order.items = order_items
+        if applied_promotion:
+            order.order_promotions = [
+                OrderPromotion(
+                    promotion_id=applied_promotion.id,
+                    discount_amount=discount_amount,
+                )
+            ]
         session.add(order)
         await session.flush()
         await audit_service.register(
@@ -100,7 +124,10 @@ class OrderService:
                 "customer_id": str(customer_id),
                 "unit_id": str(unit.id),
                 "order_channel": order_data.order_channel.value,
-                "total_amount": str(total_amount),
+                "gross_amount": str(total_amount),
+                "discount_amount": str(discount_amount),
+                "total_amount": str(order.total_amount),
+                "promotion_id": str(applied_promotion.id) if applied_promotion else None,
             },
             ip=ip,
         )
@@ -133,7 +160,7 @@ class OrderService:
         offset = (page - 1) * limit
         statement = (
             select(Order)
-            .options(selectinload(Order.items))
+            .options(selectinload(Order.items), selectinload(Order.order_promotions))
             .order_by(Order.created_at.desc())
             .offset(offset)
             .limit(limit)
@@ -151,7 +178,11 @@ class OrderService:
         return self._to_response(order)
 
     async def get_order_by_id(self, order_id: uuid.UUID, session: AsyncSession) -> Order | None:
-        statement = select(Order).options(selectinload(Order.items)).where(Order.id == order_id)
+        statement = (
+            select(Order)
+            .options(selectinload(Order.items), selectinload(Order.order_promotions))
+            .where(Order.id == order_id)
+        )
         result = await session.exec(statement)
         return result.one_or_none()
 
@@ -273,6 +304,7 @@ class OrderService:
             session.add(inventory_item)
 
     def _to_response(self, order: Order) -> OrderResponse:
+        applied_promotions = order.order_promotions
         return OrderResponse(
             id=order.id,
             customer_id=order.customer_id,
@@ -280,6 +312,10 @@ class OrderService:
             order_channel=order.order_channel,
             status=order.status,
             total_amount=order.total_amount,
+            discount_amount=sum(
+                (item.discount_amount for item in applied_promotions), Decimal("0.00")
+            ),
+            promotion_ids=[item.promotion_id for item in applied_promotions],
             notes=order.notes,
             items=order.items,
             created_at=order.created_at,

@@ -22,6 +22,7 @@ class OrderCreate(BaseModel):
     customer_id: UUID | None = Field(
         default=None,
     )
+    promotion_id: UUID | None = None
     unit_id: UUID = Field()
     order_channel: OrderChannel = Field()
     items: list[OrderItemCreate] = Field(min_length=1)
@@ -54,6 +55,8 @@ class OrderResponse(BaseModel):
     order_channel: OrderChannel = Field()
     status: OrderStatus
     total_amount: Decimal = Field()
+    discount_amount: Decimal = Field(default=Decimal("0.00"))
+    promotion_ids: list[UUID] = Field(default_factory=list)
     notes: str | None = Field(
         default=None,
     )

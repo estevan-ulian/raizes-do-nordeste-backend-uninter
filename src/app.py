@@ -15,6 +15,7 @@ from src.orders.exceptions import register_orders_exception_handlers
 from src.payments.exceptions import register_payments_exception_handlers
 from src.privacy.exceptions import register_privacy_exception_handlers
 from src.products.exceptions import register_products_exception_handlers
+from src.promotions.exceptions import register_promotions_exception_handlers
 from src.units.exceptions import register_units_exception_handlers
 
 
@@ -52,6 +53,7 @@ register_orders_exception_handlers(app)
 register_payments_exception_handlers(app)
 register_privacy_exception_handlers(app)
 register_loyalty_exception_handlers(app)
+register_promotions_exception_handlers(app)
 
 register_middlewares(app)
 

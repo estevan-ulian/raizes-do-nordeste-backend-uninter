@@ -19,6 +19,7 @@ from src.orders.models import OrderChannel, OrderStatus
 from src.orders.schemas import OrderCancel, OrderCreate, OrderListResponse, OrderResponse, OrderStatusUpdate
 from src.orders.service import OrderService
 from src.schemas import SuccessSchema
+from src.promotions.exceptions import PromotionNotApplicableException, PromotionNotFoundException
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 order_service = OrderService()
@@ -44,6 +45,8 @@ AUTHORIZATION_OPENAPI_EXTRA = {
         InsufficientPermissionException,
         OrderItemInvalidException,
         OrderStockInsufficientException,
+        PromotionNotApplicableException,
+        PromotionNotFoundException,
     ),
     status_code=status.HTTP_201_CREATED,
     openapi_extra=AUTHORIZATION_OPENAPI_EXTRA,

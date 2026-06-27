@@ -6,6 +6,7 @@ from src.loyalty.router import router as loyalty_router
 from src.orders.router import router as orders_router
 from src.payments.router import router as payments_router
 from src.products.router import router as products_router
+from src.promotions.router import router as promotions_router
 from src.schemas import HealthCheckSchema, SuccessSchema
 from src.units.router import router as units_router
 
@@ -18,6 +19,7 @@ api_router.include_router(inventory_router)
 api_router.include_router(orders_router)
 api_router.include_router(payments_router)
 api_router.include_router(loyalty_router)
+api_router.include_router(promotions_router)
 
 
 @api_router.get("/health", tags=["health"], response_model=SuccessSchema[HealthCheckSchema], status_code=200)
