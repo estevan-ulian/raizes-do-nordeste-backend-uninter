@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from src.auth.router import router as auth_router
+from src.inventory.router import router as inventory_router
 from src.orders.router import router as orders_router
 from src.payments.router import router as payments_router
 from src.products.router import router as products_router
@@ -12,6 +13,7 @@ api_router = APIRouter()
 api_router.include_router(auth_router)
 api_router.include_router(units_router)
 api_router.include_router(products_router)
+api_router.include_router(inventory_router)
 api_router.include_router(orders_router)
 api_router.include_router(payments_router)
 
