@@ -32,7 +32,7 @@ class AccountNotVerifiedException(AppException):
     """User's account is not verified"""
 
     status_code = status.HTTP_403_FORBIDDEN
-    message = "Sua conta não foi verificada. Verifique seu email e clique no link de verificação para ativar sua conta."
+    message = "Sua conta não foi verificada. Verifique seu email e clique no link de verificação para ativar sua conta."  # noqa: E501
     error_code = ErrorCode.USER_NOT_VERIFIED
 
 
