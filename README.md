@@ -182,8 +182,8 @@ Use os dados do `.env` para acessar o PostgreSQL pelo Adminer:
 ### Módulo de Promoções
 - [x] Models `Promotion` e `OrderPromotion`
 - [x] Relacionamento de promoções aplicadas ao pedido
-- [ ] Documentar regra de aplicação, restrições e impacto no valor final
-- [ ] Endpoints
+- [x] Regra percentual com período de vigência, ativação e impacto no valor final
+- [x] CRUD de promoções e aplicação opcional na criação do pedido
 
 ### Logs e Auditoria
 - [x] Model `AuditLog`
