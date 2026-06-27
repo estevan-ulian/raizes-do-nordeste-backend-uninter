@@ -29,6 +29,8 @@ from src.auth.schemas import (
 from src.auth.service import UserService
 from src.database import get_async_session
 from src.exceptions import error_responses
+from src.privacy.exceptions import PrivacyConsentRequiredException
+from src.privacy.service import privacy_service
 from src.schemas import SuccessSchema
 from src.security import (
     add_jti_to_blocklist,
@@ -82,7 +84,7 @@ async def create_user(
 ):
     """Create a new user with the specified role.
     Only ADMIN users can create users of any role, while MANAGER users can only create KITCHEN and SERVER users.
-    """
+    """  # noqa: E501
     allowed = ROLE_CREATION_PERMISSIONS.get(current_user.role, [])
     if user_data.role not in allowed:
         raise InsufficientPermissionException()
@@ -110,14 +112,18 @@ async def create_user(
     "/register",
     response_model=SuccessSchema[UserResponse],
     status_code=status.HTTP_201_CREATED,
-    responses=error_responses(UserAlreadyExistsException),
+    responses=error_responses(UserAlreadyExistsException, PrivacyConsentRequiredException),
 )
 async def register(user_data: UserRegister, session: AsyncSession = Depends(get_async_session)):
     """Public route for CUSTOMER registration."""
+    if not user_data.privacy_consent:
+        raise PrivacyConsentRequiredException()
     user_exists = await user_service.user_already_exists(user_data.email, session)
     if user_exists:
         raise UserAlreadyExistsException()
     new_user = await user_service.create_user(user_data, session, role=Role.CUSTOMER)
+    await privacy_service.register_account_consents(new_user.id, user_data.marketing_consent, session)
+    await session.commit()
     token = create_url_safe_token(
         {
             "email": new_user.email,

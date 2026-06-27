@@ -27,6 +27,10 @@ class UserService:
         else:
             user_data_dict = user_data.model_dump()
         password = user_data_dict.pop("password")
+        # LGPD consent fields are not part of the User model; they are handled
+        # separately through the privacy module.
+        user_data_dict.pop("privacy_consent", None)
+        user_data_dict.pop("marketing_consent", None)
         new_user = User(**user_data_dict)
         new_user.password_hash = generate_password_hash(password)
         new_user.role = role

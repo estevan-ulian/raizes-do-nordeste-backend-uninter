@@ -14,6 +14,13 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=32)
     phone: Optional[str] = None
+    privacy_consent: bool = Field(
+        description="Consentimento obrigatório para tratamento mínimo de dados (LGPD)."
+    )
+    marketing_consent: bool = Field(
+        default=False,
+        description="Consentimento opcional para marketing e fidelidade (LGPD).",
+    )
 
 
 class UserCreate(BaseModel):
