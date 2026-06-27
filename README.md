@@ -147,9 +147,9 @@ Use os dados do `.env` para acessar o PostgreSQL pelo Adminer:
 - [x] Model `Inventory`
 - [x] Migration da tabela `inventory`
 - [x] Restrição única por unidade/produto
-- [ ] Entrada e saída de estoque por unidade
-- [ ] Consulta de saldo por unidade
-- [ ] Bloqueio de venda por estoque insuficiente
+- [x] Entrada e saída de estoque por unidade
+- [x] Consulta de saldo por unidade
+- [x] Bloqueio de venda por estoque insuficiente
 
 ### Módulo de Pedidos
 - [x] Models `Order` e `OrderItem`
