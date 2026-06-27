@@ -35,3 +35,9 @@ api-worker-beat:				## Roda o Celery Beat para agendamento de tarefas periódica
 
 api-worker-ui:					## Roda a interface do Celery Flower para monitoramento dos workers
 	uv run celery -A src.worker.celery_app flower --port=5555
+
+api-test:								## Executa os testes unitários da aplicação
+	uv run pytest
+
+api-test-cov:						## Executa os testes unitários e gera o relatório de cobertura
+	uv run pytest --cov=src --cov-report=term-missing

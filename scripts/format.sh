@@ -2,4 +2,4 @@
 
 set -x
 
-ruff format src
+uv run ruff format src

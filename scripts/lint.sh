@@ -2,4 +2,4 @@
 
 set -x
 
-ruff check src
+uv run ruff check src
