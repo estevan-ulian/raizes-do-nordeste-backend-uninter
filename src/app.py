@@ -9,6 +9,8 @@ from src.config import config
 from src.exceptions import register_global_exception_handlers
 from src.middlewares import register_middlewares
 from src.on_startup import create_first_admin_if_not_exists
+from src.orders.exceptions import register_orders_exception_handlers
+from src.payments.exceptions import register_payments_exception_handlers
 from src.products.exceptions import register_products_exception_handlers
 from src.units.exceptions import register_units_exception_handlers
 
@@ -42,6 +44,8 @@ register_global_exception_handlers(app)
 register_auth_exception_handlers(app)
 register_units_exception_handlers(app)
 register_products_exception_handlers(app)
+register_orders_exception_handlers(app)
+register_payments_exception_handlers(app)
 
 register_middlewares(app)
 
