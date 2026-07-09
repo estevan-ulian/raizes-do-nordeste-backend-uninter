@@ -25,6 +25,9 @@ router = APIRouter(prefix="/products", tags=["products"])
 product_service = ProductService()
 unit_service = UnitService()
 manage_products_role_checker = RoleChecker(allowed_roles=[Role.ADMIN, Role.MANAGER])
+read_products_role_checker = RoleChecker(
+    allowed_roles=[Role.ADMIN, Role.MANAGER, Role.CUSTOMER, Role.SERVER, Role.KITCHEN]
+)
 AUTHORIZATION_OPENAPI_EXTRA = {
     "parameters": [
         {
@@ -113,7 +116,7 @@ async def list_products(
     category: str | None = Query(default=None, min_length=1, max_length=100),
     include_inactive: bool = Query(default=False, alias="includeInactive"),
     session: AsyncSession = Depends(get_async_session),
-    _current_user: User = Depends(manage_products_role_checker),
+    _current_user: User = Depends(read_products_role_checker),
 ):
     """List products with pagination and filters."""
     if unit_id:
@@ -145,7 +148,7 @@ async def list_products(
 async def get_product(
     product_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
-    _current_user: User = Depends(manage_products_role_checker),
+    _current_user: User = Depends(read_products_role_checker),
 ):
     """Get a product by id."""
     product = await product_service.get_product_by_id(product_id, session)
