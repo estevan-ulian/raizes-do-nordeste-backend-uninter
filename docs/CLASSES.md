@@ -7,7 +7,7 @@ classDiagram
         +String name
         +String email
         +String password_hash
-        +String phone
+        +String? phone
         +Role role
         +Boolean is_verified
         +DateTime created_at
@@ -27,10 +27,10 @@ classDiagram
         +UUID id
         +UUID unit_id
         +String name
-        +String description
+        +String? description
         +Decimal price
         +String category
-        +String image_url
+        +String? image_url
         +Boolean is_active
         +DateTime created_at
         +DateTime updated_at
@@ -53,7 +53,7 @@ classDiagram
         +OrderChannel order_channel
         +OrderStatus status
         +Decimal total_amount
-        +String notes
+        +String? notes
         +DateTime created_at
         +DateTime updated_at
     }
@@ -74,8 +74,8 @@ classDiagram
         +PaymentStatus status
         +Decimal amount
         +String method
-        +Dict gateway_response
-        +String gateway_transaction_id
+        +Dict? gateway_response
+        +String? gateway_transaction_id
         +DateTime created_at
         +DateTime updated_at
     }
@@ -100,7 +100,7 @@ classDiagram
     class Promotion {
         +UUID id
         +String name
-        +String description
+        +String? description
         +Decimal discount_percent
         +Date starts_at
         +Date ends_at
@@ -124,17 +124,17 @@ classDiagram
         +String legal_basis
         +Boolean is_granted
         +DateTime created_at
-        +DateTime revoked_at
+        +DateTime? revoked_at
     }
 
     class AuditLog {
         +UUID id
-        +UUID user_id
+        +UUID? user_id
         +String action
         +String resource
-        +UUID resource_id
-        +Dict details
-        +String ip
+        +UUID? resource_id
+        +Dict? details
+        +String? ip
         +DateTime created_at
     }
 
@@ -178,7 +178,7 @@ classDiagram
     User "1" --> "0..*" Order : customer
     User "1" --> "0..1" LoyaltyAccount : has
     User "1" --> "0..*" LGPDConsent : grants
-    User "1" --> "0..*" AuditLog : performs
+    User "0..1" --> "0..*" AuditLog : performs
     Unit "1" --> "0..*" Product : offers
     Unit "1" --> "0..*" Inventory : controls
     Unit "1" --> "0..*" Order : serves

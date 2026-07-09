@@ -8,7 +8,7 @@ erDiagram
         varchar email UK
         varchar password_hash
         varchar phone
-        enum role "admin|manager|kitchen|server|customer"
+        enum role "ADMIN|MANAGER|KITCHEN|SERVER|CUSTOMER"
         boolean is_verified
         timestamp created_at
         timestamp updated_at
@@ -74,7 +74,7 @@ erDiagram
         enum status "PENDING|APPROVED|REJECTED"
         decimal amount
         varchar method
-        json gateway_response
+        jsonb gateway_response
         varchar gateway_transaction_id
         timestamp created_at
         timestamp updated_at
@@ -129,11 +129,11 @@ erDiagram
 
     AUDIT_LOG {
         uuid id PK
-        uuid user_id FK
+        uuid user_id FK "nullable"
         varchar action
         varchar resource
         uuid resource_id
-        json details
+        jsonb details
         varchar ip
         timestamp created_at
     }
