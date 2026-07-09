@@ -176,8 +176,11 @@ Use os dados do `.env` para acessar o PostgreSQL pelo Adminer:
 ### Módulo de Fidelidade
 - [x] Models `LoyaltyAccount` e `LoyaltyRedemption`
 - [x] Conta de fidelidade 1:1 por cliente
-- [ ] Documentar regra de pontos, saldo, resgate simples e consentimento
-- [ ] Endpoints
+- [x] Documentar regra de pontos, saldo, resgate simples e consentimento
+- [x] Endpoints `GET /loyalty/me` e `POST /loyalty/me/redemptions`
+- [x] Acúmulo de pontos em pagamentos aprovados com consentimento de marketing/fidelidade
+- [ ] Política de expiração de pontos
+- [ ] Consulta administrativa de contas e resgates
 
 ### Módulo de Promoções
 - [x] Models `Promotion` e `OrderPromotion`
@@ -187,21 +190,25 @@ Use os dados do `.env` para acessar o PostgreSQL pelo Adminer:
 
 ### Logs e Auditoria
 - [x] Model `AuditLog`
-- [ ] Registrar ações sensíveis: criação de pedido, mudança de status e pagamento
-- [ ] Definir política para logs sem usuário autenticado
-- [ ] Documentar formato e consulta de logs
+- [x] Registrar ações sensíveis: criação de pedido, cancelamento, mudança de status e pagamento
+- [x] Registrar movimentações de estoque e alterações de promoções
+- [x] Persistir usuário, recurso, IP e detalhes operacionais da ação
+- [ ] Endpoint administrativo para consulta de logs
+- [ ] Definir política de retenção de logs
 
 ### LGPD e Privacidade
 - [x] Model `LGPDConsent`
-- [ ] Consentimento no cadastro de cliente
-- [ ] Documentar finalidade e base legal
+- [x] Consentimento no cadastro de cliente
+- [x] Finalidades `ACCOUNT_CREATION` e `MARKETING_AND_LOYALTY`
+- [x] Bases legais `CONTRACT_EXECUTION` e `CONSENT`
+- [x] Consentimento de marketing/fidelidade controla acúmulo de pontos
+- [ ] Fluxo para revogação de consentimento
 - [ ] Documentar minimização de dados pessoais
 - [ ] Documentar retenção, exclusão ou anonimização
 
 ### API, Contratos e Testes
-- [ ] Documentar endpoints
-- [ ] Definir contrato por endpoint: método, path, auth/permissões, params, body, response, status codes e exemplo JSON
-- [ ] Padronizar paginação com `page` e `limit` nas listagens
+- [x] Documentar endpoints principais no README
+- [x] Definir contrato por endpoint: método, path, auth/permissões, params, body, response, status codes e exemplo JSON
+- [x] Padronizar paginação com `page` e `limit` nas listagens implementadas
 - [ ] Criar coleção Postman/Insomnia com fluxo principal
-- [x] [Criar plano de testes com pelo menos 10 cenários](docs/TEST_PLAN.md)
-- [ ] Documentar ordem de execução dos testes e evidências
+- [ ] Criar plano de testes com pelo menos 10 cenários
