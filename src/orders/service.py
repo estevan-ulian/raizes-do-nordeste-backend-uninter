@@ -33,22 +33,26 @@ VALID_STATUS_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
     OrderStatus.DELIVERED: set(),
     OrderStatus.CANCELED: set(),
 }
+ANONYMOUS_ORDER_CHANNELS = {OrderChannel.TOTEM, OrderChannel.COUNTER}
 
 
 class OrderService:
     async def create_order(
         self,
         order_data: OrderCreate,
-        current_user: User,
+        current_user: User | None,
         session: AsyncSession,
         actor_id: uuid.UUID | None = None,
         ip: str | None = None,
     ) -> OrderResponse:
-        customer_id = order_data.customer_id or current_user.id
-        if current_user.role == Role.CUSTOMER and customer_id != current_user.id:
+        customer_id = order_data.customer_id
+        if current_user and current_user.role == Role.CUSTOMER:
+            customer_id = order_data.customer_id or current_user.id
+        if current_user and current_user.role == Role.CUSTOMER and customer_id != current_user.id:
             raise OrderItemInvalidException()
-        customer = await self._get_customer_by_id(customer_id, session)
-        if not customer:
+        if customer_id is None and order_data.order_channel not in ANONYMOUS_ORDER_CHANNELS:
+            raise OrderItemInvalidException()
+        if customer_id and not await self._get_customer_by_id(customer_id, session):
             raise OrderItemInvalidException()
 
         unit = await self._get_active_unit(order_data.unit_id, session)
@@ -66,8 +70,6 @@ class OrderService:
         required_quantities: dict[uuid.UUID, int] = {}
         for item in order_data.items:
             product = products_by_id[item.product_id]
-            if product.unit_id != unit.id:
-                raise OrderItemInvalidException()
             required_quantities[product.id] = required_quantities.get(product.id, 0) + item.quantity
             subtotal = product.price * item.quantity
             total_amount += subtotal
@@ -85,16 +87,14 @@ class OrderService:
         applied_promotion = None
         discount_amount = Decimal("0.00")
         if order_data.promotion_id:
-            applied_promotion = await promotion_service.get_promotion_by_id(
-                order_data.promotion_id, session
-            )
+            applied_promotion = await promotion_service.get_promotion_by_id(order_data.promotion_id, session)
             if applied_promotion is None:
                 raise PromotionNotFoundException()
             if not promotion_service.is_applicable(applied_promotion):
                 raise PromotionNotApplicableException()
-            discount_amount = (
-                total_amount * applied_promotion.discount_percent / Decimal("100")
-            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            discount_amount = (total_amount * applied_promotion.discount_percent / Decimal("100")).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
 
         order = Order(
             customer_id=customer_id,
@@ -102,6 +102,7 @@ class OrderService:
             order_channel=order_data.order_channel,
             status=OrderStatus.WAITING_FOR_PAYMENT,
             total_amount=total_amount - discount_amount,
+            payment_method=order_data.payment_method,
             notes=order_data.notes,
         )
         order.items = order_items
@@ -119,11 +120,12 @@ class OrderService:
             action=AuditAction.ORDER_CREATED,
             resource="order",
             resource_id=order.id,
-            user_id=actor_id or current_user.id,
+            user_id=actor_id or (current_user.id if current_user else None),
             details={
-                "customer_id": str(customer_id),
+                "customer_id": str(customer_id) if customer_id else None,
                 "unit_id": str(unit.id),
                 "order_channel": order_data.order_channel.value,
+                "payment_method": order_data.payment_method,
                 "gross_amount": str(total_amount),
                 "discount_amount": str(discount_amount),
                 "total_amount": str(order.total_amount),
@@ -312,9 +314,8 @@ class OrderService:
             order_channel=order.order_channel,
             status=order.status,
             total_amount=order.total_amount,
-            discount_amount=sum(
-                (item.discount_amount for item in applied_promotions), Decimal("0.00")
-            ),
+            payment_method=order.payment_method,
+            discount_amount=sum((item.discount_amount for item in applied_promotions), Decimal("0.00")),
             promotion_ids=[item.promotion_id for item in applied_promotions],
             notes=order.notes,
             items=order.items,

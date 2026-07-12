@@ -50,11 +50,12 @@ class OrderResponse(BaseModel):
     """Schema for order data returned in responses."""
 
     id: UUID
-    customer_id: UUID = Field()
+    customer_id: UUID | None = Field(default=None)
     unit_id: UUID = Field()
     order_channel: OrderChannel = Field()
     status: OrderStatus
     total_amount: Decimal = Field()
+    payment_method: str = Field()
     discount_amount: Decimal = Field(default=Decimal("0.00"))
     promotion_ids: list[UUID] = Field(default_factory=list)
     notes: str | None = Field(
