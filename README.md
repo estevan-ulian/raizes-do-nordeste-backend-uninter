@@ -123,7 +123,7 @@ Use os dados do `.env` para acessar o PostgreSQL pelo Adminer:
 - [x] [Diagrama Entidade-Relacionamento](docs/DER.md)
 - [x] [Diagrama de Casos de Uso](docs/USE_CASES.md)
 - [x] [Diagrama de Classes](docs/CLASSES.md)
-- [x] [Diagrama de sequência do fluxo](docs/FLOW.md)
+- [ ] Diagrama de sequência do fluxo principal de pedido/pagamento
 - [x] [Diagrama de arquitetura por camadas](docs/ARCHITECTURE.md)
 - [x] Models de domínio criados com SQLModel
 - [x] Relationships dos models implementados conforme DER
@@ -138,8 +138,12 @@ Use os dados do `.env` para acessar o PostgreSQL pelo Adminer:
 
 ### Módulo de Produtos/Cardápio
 - [x] Model `Product`
+- [x] Model `ProductCategory`
 - [x] CRUD endpoints em `/products`
-- [x] Listagem de cardápio por unidade
+- [x] CRUD parcial de categorias em `/products/categories`
+- [x] Listagem de cardápio por categoria
+- [x] Listagem pública de cardápio por unidade em `/units/{unit_id}/menu`
+- [x] Disponibilidade derivada do estoque local sem exposição do saldo exato
 - [x] Paginação e filtros aplicáveis
 - [x] Upload local de imagem via `multipart/form-data` e persistência em `image_url`
 
@@ -155,6 +159,8 @@ Use os dados do `.env` para acessar o PostgreSQL pelo Adminer:
 - [x] Models `Order` e `OrderItem`
 - [x] Campo `order_channel` com ENUM APP, TOTEM, COUNTER, PICKUP e WEB
 - [x] Campo `status` alinhado ao DER: WAITING_FOR_PAYMENT, PAID, IN_THE_KITCHEN, READY, DELIVERED, CANCELED
+- [x] Campo `payment_method` no pedido
+- [x] Pedidos anônimos para TOTEM e COUNTER
 - [x] Criar pedido com `canalPedido`
 - [x] Validar itens do pedido e existência de produto/unidade
 - [x] Listar/filtrar pedidos por `canalPedido` e `status`
@@ -169,7 +175,7 @@ Use os dados do `.env` para acessar o PostgreSQL pelo Adminer:
 - [x] Campo `status` alinhado ao DER: PENDING, APPROVED, REJECTED
 - [x] Mock gateway de pagamento
 - [x] Endpoint `POST /payments`
-- [x] Aprovar/recusar pagamento mock e atualizar status do pedido
+- [x] Aprovar pagamento mock e atualizar status do pedido
 - [x] Retornar payload de status ao cliente
 - [x] Integração com OrderService para marcar pedido como pago
 
@@ -208,7 +214,7 @@ Use os dados do `.env` para acessar o PostgreSQL pelo Adminer:
 
 ### API, Contratos e Testes
 - [x] Documentar endpoints principais no README
-- [x] Definir contrato por endpoint: método, path, auth/permissões, params, body, response, status codes e exemplo JSON
+- [ ] Definir contrato completo por endpoint: método, path, auth/permissões, params, body, response, status codes e exemplo JSON
 - [x] Padronizar paginação com `page` e `limit` nas listagens implementadas
 - [ ] Criar coleção Postman/Insomnia com fluxo principal
 - [ ] Criar plano de testes com pelo menos 10 cenários

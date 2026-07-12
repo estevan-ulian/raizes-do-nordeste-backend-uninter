@@ -16,13 +16,13 @@ flowchart TB
         ROUTERS["Routers por módulo<br/>auth, units, products,<br/>inventory, orders, payments,<br/>loyalty, promotions"]
         MIDDLEWARE["Middleware<br/>CORS"]
         EX_HANDLERS["Exception handlers<br/>globais e por módulo"]
-        STATIC["StaticFiles<br/>/uploads"]
+        STATIC["StaticFiles<br/>/uploads<br/>(exposto como /api/uploads por padrão)"]
     end
 
     subgraph Access["Acesso e Segurança"]
         DEPENDENCIES["Dependências FastAPI<br/>AccessTokenBearer, RefreshTokenBearer,<br/>get_current_user, RoleChecker"]
         SECURITY["Security<br/>JWT, bcrypt,<br/>tokens URL-safe"]
-        REDIS_BLOCKLIST["Redis<br/>blocklist de tokens<br/>e tokens de reset"]
+        REDIS["Redis<br/>blocklist de tokens +<br/>broker/backend Celery"]
     end
 
     subgraph Application["Application Layer"]
@@ -31,8 +31,8 @@ flowchart TB
     end
 
     subgraph Domain["Domain Layer"]
-        MODELS["Models SQLModel<br/>User, Unit, Product,<br/>Inventory, Order, Payment,<br/>Loyalty, Promotion,<br/>LGPDConsent, AuditLog"]
-        ENUMS["Enums<br/>Role, OrderChannel,<br/>OrderStatus, PaymentStatus"]
+        MODELS["Models SQLModel<br/>User, Unit, Product, ProductCategory,<br/>Inventory, Order, OrderItem, Payment,<br/>LoyaltyAccount, LoyaltyRedemption,<br/>Promotion, OrderPromotion,<br/>LGPDConsent, AuditLog"]
+        ENUMS["Enums<br/>Role, OrderChannel, OrderStatus,<br/>PaymentStatus, InventoryMovementType"]
         EXCEPTIONS["Exceptions<br/>erros de domínio por módulo"]
     end
 
@@ -41,7 +41,6 @@ flowchart TB
         POSTGRES[("PostgreSQL")]
         ALEMBIC["Alembic<br/>migrations"]
         CELERY["Celery Worker"]
-        REDIS_BROKER[("Redis<br/>broker/backend Celery")]
         MAIL["FastAPI Mail"]
         STORAGE["LocalStorage<br/>imagens de produtos"]
     end
@@ -56,10 +55,11 @@ flowchart TB
 
     ROUTERS --> DEPENDENCIES
     DEPENDENCIES --> SECURITY
-    SECURITY --> REDIS_BLOCKLIST
+    SECURITY --> REDIS
 
     ROUTERS --> SERVICES
     ROUTERS --> SCHEMAS
+    SERVICES --> SCHEMAS
     SERVICES --> MODELS
     SERVICES --> ENUMS
     SERVICES --> EXCEPTIONS
@@ -68,8 +68,9 @@ flowchart TB
     DB_SESSION --> POSTGRES
     ALEMBIC --> POSTGRES
 
-    SERVICES --> STORAGE
+    ROUTERS --> STORAGE
+    STATIC --> STORAGE
     ROUTERS --> CELERY
-    CELERY --> REDIS_BROKER
+    CELERY --> REDIS
     CELERY --> MAIL
 ```

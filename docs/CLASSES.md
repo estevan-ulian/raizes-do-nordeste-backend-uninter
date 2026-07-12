@@ -10,6 +10,7 @@ classDiagram
         +String? phone
         +Role role
         +Boolean is_verified
+        +Boolean is_active
         +DateTime created_at
         +DateTime updated_at
     }
@@ -25,13 +26,19 @@ classDiagram
 
     class Product {
         +UUID id
-        +UUID unit_id
         +String name
         +String? description
         +Decimal price
-        +String category
+        +UUID category_id
         +String? image_url
         +Boolean is_active
+        +DateTime created_at
+        +DateTime updated_at
+    }
+
+    class ProductCategory {
+        +UUID id
+        +String name
         +DateTime created_at
         +DateTime updated_at
     }
@@ -48,11 +55,12 @@ classDiagram
 
     class Order {
         +UUID id
-        +UUID customer_id
+        +UUID? customer_id
         +UUID unit_id
         +OrderChannel order_channel
         +OrderStatus status
         +Decimal total_amount
+        +String payment_method
         +String? notes
         +DateTime created_at
         +DateTime updated_at
@@ -175,13 +183,13 @@ classDiagram
     }
 
     %% Relacionamentos
-    User "1" --> "0..*" Order : customer
+    User "0..1" --> "0..*" Order : customer
     User "1" --> "0..1" LoyaltyAccount : has
     User "1" --> "0..*" LGPDConsent : grants
     User "0..1" --> "0..*" AuditLog : performs
-    Unit "1" --> "0..*" Product : offers
     Unit "1" --> "0..*" Inventory : controls
     Unit "1" --> "0..*" Order : serves
+    ProductCategory "1" --> "0..*" Product : classifies
     Product "1" --> "0..*" OrderItem : appears_in
     Product "1" --> "0..*" Inventory : stocked_by_unit
     Order "1" --> "1..*" OrderItem : contains
@@ -189,4 +197,16 @@ classDiagram
     Order "1" --> "0..*" OrderPromotion : applies
     Promotion "1" --> "0..*" OrderPromotion : discounts
     LoyaltyAccount "1" --> "0..*" LoyaltyRedemption : redeems
+
+    User --> Role : role
+    Order --> OrderChannel : channel
+    Order --> OrderStatus : status
+    Payment --> PaymentStatus : status
+
+    note for ProductCategory "name unique (case-insensitive)"
+    note for Inventory "unique(unit_id, product_id)"
+    note for Payment "order_id unique"
+    note for LoyaltyAccount "customer_id unique"
+    note for Order "customer_id is optional only for TOTEM and COUNTER"
+    note for PaymentStatus "REJECTED exists in the model, but the current mock only produces APPROVED"
 ```

@@ -8,8 +8,9 @@ erDiagram
         varchar email UK
         varchar password_hash
         varchar phone
-        enum role "ADMIN|MANAGER|KITCHEN|SERVER|CUSTOMER"
+        enum role "admin|manager|kitchen|server|customer"
         boolean is_verified
+        boolean is_active
         timestamp created_at
         timestamp updated_at
     }
@@ -25,21 +26,27 @@ erDiagram
 
     PRODUCT {
         uuid id PK
-        uuid unit_id FK
         varchar name
         text description
         decimal price
-        varchar category
+        uuid category_id FK
         varchar image_url
         boolean is_active
         timestamp created_at
         timestamp updated_at
     }
 
+    PRODUCT_CATEGORY {
+        uuid id PK
+        varchar name UK "case-insensitive"
+        timestamp created_at
+        timestamp updated_at
+    }
+
     INVENTORY {
         uuid id PK
-        uuid unit_id FK
-        uuid product_id FK
+        uuid unit_id FK "UK(unit_id, product_id)"
+        uuid product_id FK "UK(unit_id, product_id)"
         integer quantity
         integer minimum_quantity
         timestamp created_at
@@ -48,11 +55,12 @@ erDiagram
 
     ORDER {
         uuid id PK
-        uuid customer_id FK
+        uuid customer_id FK "nullable"
         uuid unit_id FK
         enum order_channel "APP|TOTEM|COUNTER|PICKUP|WEB"
         enum status "WAITING_FOR_PAYMENT|PAID|IN_THE_KITCHEN|READY|DELIVERED|CANCELED"
         decimal total_amount
+        varchar payment_method
         text notes
         timestamp created_at
         timestamp updated_at
@@ -70,7 +78,7 @@ erDiagram
 
     PAYMENT {
         uuid id PK
-        uuid order_id FK
+        uuid order_id FK, UK
         enum status "PENDING|APPROVED|REJECTED"
         decimal amount
         varchar method
@@ -82,7 +90,7 @@ erDiagram
 
     LOYALTY_ACCOUNT {
         uuid id PK
-        uuid customer_id FK
+        uuid customer_id FK, UK
         integer points_balance
         boolean consent_granted
         timestamp created_at
@@ -132,20 +140,20 @@ erDiagram
         uuid user_id FK "nullable"
         varchar action
         varchar resource
-        uuid resource_id
+        uuid resource_id "nullable"
         jsonb details
         varchar ip
         timestamp created_at
     }
 
     %% Relacionamentos
-    USER ||--o{ ORDER : "customer places"
+    USER o|--o{ ORDER : "customer optionally places"
     USER ||--o| LOYALTY_ACCOUNT : "has"
     USER ||--o{ LGPD_CONSENT : "grants"
-    USER ||--o{ AUDIT_LOG : "performs"
-    UNIT ||--o{ PRODUCT : "offers"
+    USER o|--o{ AUDIT_LOG : "optionally performs"
     UNIT ||--o{ INVENTORY : "controls"
     UNIT ||--o{ ORDER : "serves"
+    PRODUCT_CATEGORY ||--o{ PRODUCT : "classifies"
     PRODUCT ||--o{ ORDER_ITEM : "appears in"
     PRODUCT ||--o{ INVENTORY : "stocked by unit"
     ORDER ||--|{ ORDER_ITEM : "contains"
