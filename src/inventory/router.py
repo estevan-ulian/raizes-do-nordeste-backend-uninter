@@ -16,6 +16,7 @@ from src.products.service import ProductService
 from src.schemas import SuccessSchema
 from src.units.exceptions import UnitNotFoundException
 from src.units.service import UnitService
+from src.utils import get_request_ip
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 inventory_service = InventoryService()
@@ -56,7 +57,7 @@ async def apply_inventory_movement(
 ):
     """Apply an inventory entry or exit movement."""
     await ensure_unit_and_product_match(movement_data.unit_id, movement_data.product_id, session)
-    ip = request.client.host if request.client else None
+    ip = get_request_ip(request)
     inventory_item = await inventory_service.apply_movement(
         movement_data, session, actor_id=current_user.id, ip=ip
     )
@@ -122,6 +123,4 @@ async def ensure_unit_and_product_match(
     session: AsyncSession,
 ) -> None:
     await ensure_unit_exists(unit_id, session)
-    product = await ensure_product_exists(product_id, session)
-    if product.unit_id != unit_id:
-        raise ProductNotFoundException()
+    await ensure_product_exists(product_id, session)

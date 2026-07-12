@@ -20,6 +20,7 @@ from src.promotions.schemas import (
 )
 from src.promotions.service import promotion_service
 from src.schemas import SuccessSchema
+from src.utils import get_request_ip
 
 router = APIRouter(prefix="/promotions", tags=["promotions"])
 manage_promotions = RoleChecker(allowed_roles=[Role.ADMIN, Role.MANAGER])
@@ -55,7 +56,7 @@ async def create_promotion(
         data,
         session,
         current_user.id,
-        request.client.host if request.client else None,
+        get_request_ip(request),
     )
     return SuccessSchema(message="Promoção criada com sucesso.", result=promotion)
 
@@ -132,7 +133,7 @@ async def update_promotion(
         data,
         session,
         current_user.id,
-        request.client.host if request.client else None,
+        get_request_ip(request),
     )
     return SuccessSchema(message="Promoção atualizada com sucesso.", result=updated)
 
@@ -158,6 +159,6 @@ async def deactivate_promotion(
         promotion,
         session,
         current_user.id,
-        request.client.host if request.client else None,
+        get_request_ip(request),
     )
     return SuccessSchema(message="Promoção desativada com sucesso.", result=deactivated)

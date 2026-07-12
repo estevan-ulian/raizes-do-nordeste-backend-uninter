@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.audit.service import AuditAction, audit_service
 from src.privacy.models import LGPDConsent
 
 
@@ -13,6 +14,8 @@ class PrivacyService:
         user_id: UUID,
         marketing_consent: bool,
         session: AsyncSession,
+        actor_id: UUID | None = None,
+        ip: str | None = None,
     ) -> list[LGPDConsent]:
         """Register the minimum LGPD consents for a newly created account.
 
@@ -40,6 +43,19 @@ class PrivacyService:
         for consent in consents:
             session.add(consent)
         await session.flush()
+        await audit_service.register(
+            session,
+            action=AuditAction.LGPD_CONSENTS_REGISTERED,
+            resource="user",
+            resource_id=user_id,
+            user_id=actor_id or user_id,
+            details={
+                "user_id": str(user_id),
+                "purposes": [consent.purpose for consent in consents],
+                "marketing_consent": marketing_consent,
+            },
+            ip=ip,
+        )
         return consents
 
 
