@@ -1,11 +1,19 @@
 import uuid
 
-from sqlmodel import select
+from sqlalchemy import and_
+from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.audit.service import AuditAction, audit_service
+from src.inventory.models import Inventory
+from src.products.models import Product, ProductCategory
 from src.units.models import Unit
-from src.units.schemas import UnitCreate, UnitUpdate
+from src.units.schemas import (
+    UnitCreate,
+    UnitMenuCategoryResponse,
+    UnitMenuItemResponse,
+    UnitUpdate,
+)
 from src.utils import get_utc_now
 
 
@@ -43,6 +51,64 @@ class UnitService:
         statement = select(Unit).where(Unit.id == unit_id)
         result = await session.exec(statement)
         return result.one_or_none()
+
+    async def list_menu(
+        self,
+        unit_id: uuid.UUID,
+        session: AsyncSession,
+        page: int = 1,
+        limit: int = 20,
+        category_id: uuid.UUID | None = None,
+        include_unavailable: bool = False,
+    ) -> tuple[list[UnitMenuItemResponse], int]:
+        """List active global products with their availability at a unit.
+
+        Exact inventory quantities are intentionally not exposed. Availability
+        is informative; order creation remains responsible for locking and
+        validating the current inventory balance.
+        """
+        inventory_join = and_(
+            Inventory.unit_id == unit_id,
+            Inventory.product_id == Product.id,
+        )
+        filters = [Product.is_active]
+        if category_id:
+            filters.append(Product.category_id == category_id)
+        if not include_unavailable:
+            filters.append(Inventory.quantity > 0)
+
+        total_statement = (
+            select(func.count(Product.id))
+            .join(ProductCategory, ProductCategory.id == Product.category_id)
+            .outerjoin(Inventory, inventory_join)
+            .where(*filters)
+        )
+        total_result = await session.exec(total_statement)
+        total = total_result.one()
+
+        statement = (
+            select(Product, ProductCategory, Inventory.quantity)
+            .join(ProductCategory, ProductCategory.id == Product.category_id)
+            .outerjoin(Inventory, inventory_join)
+            .where(*filters)
+            .order_by(ProductCategory.name, Product.name)
+            .offset((page - 1) * limit)
+            .limit(limit)
+        )
+        result = await session.exec(statement)
+        items = [
+            UnitMenuItemResponse(
+                id=product.id,
+                name=product.name,
+                description=product.description,
+                price=product.price,
+                image_url=product.image_url,
+                category=UnitMenuCategoryResponse(id=category.id, name=category.name),
+                available=quantity is not None and quantity > 0,
+            )
+            for product, category, quantity in result.all()
+        ]
+        return items, total
 
     async def update_unit(
         self,

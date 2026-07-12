@@ -10,7 +10,7 @@ from src.database import get_async_session
 from src.exceptions import error_responses
 from src.schemas import SuccessSchema
 from src.units.exceptions import UnitNotFoundException
-from src.units.schemas import UnitCreate, UnitResponse, UnitUpdate
+from src.units.schemas import UnitCreate, UnitMenuResponse, UnitResponse, UnitUpdate
 from src.units.service import UnitService
 from src.utils import get_request_ip
 
@@ -65,6 +65,43 @@ async def list_units(
     """List business units."""
     units = await unit_service.list_units(session, include_inactive=include_inactive)
     return SuccessSchema(message="Unidades obtidas com sucesso.", result=units)
+
+
+@router.get(
+    "/{unit_id}/menu",
+    response_model=SuccessSchema[UnitMenuResponse],
+    responses=error_responses(UnitNotFoundException),
+    status_code=status.HTTP_200_OK,
+)
+async def get_unit_menu(
+    unit_id: uuid.UUID,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    category_id: uuid.UUID | None = Query(default=None, alias="categoryId"),
+    include_unavailable: bool = Query(default=False, alias="includeUnavailable"),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Return the public menu and product availability for an active unit."""
+    unit = await unit_service.get_unit_by_id(unit_id, session)
+    if not unit or not unit.is_active:
+        raise UnitNotFoundException()
+    items, total = await unit_service.list_menu(
+        unit_id,
+        session,
+        page=page,
+        limit=limit,
+        category_id=category_id,
+        include_unavailable=include_unavailable,
+    )
+    result = UnitMenuResponse(
+        unit_id=unit.id,
+        unit_name=unit.name,
+        items=items,
+        total=total,
+        page=page,
+        limit=limit,
+    )
+    return SuccessSchema(message="Cardápio da unidade obtido com sucesso.", result=result)
 
 
 @router.get(
