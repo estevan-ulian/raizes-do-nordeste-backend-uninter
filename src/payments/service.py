@@ -22,7 +22,7 @@ class PaymentService:
     async def request_mock_payment(
         self,
         payment_data: PaymentCreate,
-        current_user: User,
+        current_user: User | None,
         session: AsyncSession,
         actor_id: uuid.UUID | None = None,
         ip: str | None = None,
@@ -30,13 +30,14 @@ class PaymentService:
         order = await self.order_service.get_order_by_id(payment_data.order_id, session)
         if not order:
             raise PaymentInvalidException()
-        self.order_service.ensure_customer_owns_order(current_user, order)
+        if current_user:
+            self.order_service.ensure_customer_owns_order(current_user, order)
         if order.status != OrderStatus.WAITING_FOR_PAYMENT:
             raise PaymentInvalidException()
         if await self.get_payment_by_order_id(order.id, session):
             raise PaymentAlreadyExistsException()
 
-        payment_status = payment_data.force_status or PaymentStatus.APPROVED
+        payment_status = PaymentStatus.APPROVED
         transaction_id = f"mock_{uuid.uuid4()}"
         gateway_response = {
             "provider": "mock",
@@ -54,15 +55,14 @@ class PaymentService:
             gateway_transaction_id=transaction_id,
         )  # type: ignore
         session.add(payment)
-        if payment_status == PaymentStatus.APPROVED:
-            await self.order_service.mark_order_paid(order, session)
+        await self.order_service.mark_order_paid(order, session)
         await session.flush()
         await audit_service.register(
             session,
             action=AuditAction.PAYMENT_PROCESSED,
             resource="payment",
             resource_id=payment.id,
-            user_id=actor_id or current_user.id,
+            user_id=actor_id or (current_user.id if current_user else None),
             details={
                 "order_id": str(order.id),
                 "status": payment_status.value,
@@ -71,8 +71,14 @@ class PaymentService:
             },
             ip=ip,
         )
-        if payment_status == PaymentStatus.APPROVED:
-            await loyalty_service.add_points(order.customer_id, order.total_amount, session)
+        if order.customer_id:
+            await loyalty_service.add_points(
+                order.customer_id,
+                order.total_amount,
+                session,
+                actor_id=actor_id or (current_user.id if current_user else None),
+                ip=ip,
+            )
         await session.commit()
         await session.refresh(payment)
         return payment

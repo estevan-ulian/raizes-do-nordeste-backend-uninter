@@ -12,9 +12,6 @@ class PaymentCreate(BaseModel):
 
     order_id: UUID = Field()
     method: str = Field(default="MOCK", min_length=1, max_length=50)
-    force_status: PaymentStatus | None = Field(
-        default=None,
-    )
 
     model_config = ConfigDict(populate_by_name=True)
 
