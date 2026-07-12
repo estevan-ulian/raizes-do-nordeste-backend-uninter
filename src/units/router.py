@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.auth.dependencies import RoleChecker
@@ -12,6 +12,7 @@ from src.schemas import SuccessSchema
 from src.units.exceptions import UnitNotFoundException
 from src.units.schemas import UnitCreate, UnitResponse, UnitUpdate
 from src.units.service import UnitService
+from src.utils import get_request_ip
 
 router = APIRouter(prefix="/units", tags=["units"])
 unit_service = UnitService()
@@ -38,11 +39,14 @@ AUTHORIZATION_OPENAPI_EXTRA = {
 )
 async def create_unit(
     unit_data: UnitCreate,
+    request: Request,
     session: AsyncSession = Depends(get_async_session),
-    _current_user: User = Depends(manage_units_role_checker),
+    current_user: User = Depends(manage_units_role_checker),
 ):
     """Create a new business unit. Requires ADMIN or MANAGER role."""
-    new_unit = await unit_service.create_unit(unit_data, session)
+    new_unit = await unit_service.create_unit(
+        unit_data, session, actor_id=current_user.id, ip=get_request_ip(request)
+    )
     return SuccessSchema(message="Unidade criada com sucesso.", result=new_unit)
 
 
@@ -92,14 +96,17 @@ async def get_unit(
 async def update_unit(
     unit_id: uuid.UUID,
     unit_data: UnitUpdate,
+    request: Request,
     session: AsyncSession = Depends(get_async_session),
-    _current_user: User = Depends(manage_units_role_checker),
+    current_user: User = Depends(manage_units_role_checker),
 ):
     """Update a business unit. Requires ADMIN or MANAGER role."""
     unit = await unit_service.get_unit_by_id(unit_id, session)
     if not unit:
         raise UnitNotFoundException()
-    updated_unit = await unit_service.update_unit(unit, unit_data, session)
+    updated_unit = await unit_service.update_unit(
+        unit, unit_data, session, actor_id=current_user.id, ip=get_request_ip(request)
+    )
     return SuccessSchema(message="Unidade atualizada com sucesso.", result=updated_unit)
 
 
@@ -112,12 +119,15 @@ async def update_unit(
 )
 async def deactivate_unit(
     unit_id: uuid.UUID,
+    request: Request,
     session: AsyncSession = Depends(get_async_session),
-    _current_user: User = Depends(manage_units_role_checker),
+    current_user: User = Depends(manage_units_role_checker),
 ):
     """Deactivate a business unit. Requires ADMIN or MANAGER role."""
     unit = await unit_service.get_unit_by_id(unit_id, session)
     if not unit:
         raise UnitNotFoundException()
-    deactivated_unit = await unit_service.deactivate_unit(unit, session)
+    deactivated_unit = await unit_service.deactivate_unit(
+        unit, session, actor_id=current_user.id, ip=get_request_ip(request)
+    )
     return SuccessSchema(message="Unidade desativada com sucesso.", result=deactivated_unit)

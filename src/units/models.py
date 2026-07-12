@@ -10,7 +10,6 @@ from src.utils import get_utc_now
 if TYPE_CHECKING:
     from src.inventory.models import Inventory
     from src.orders.models import Order
-    from src.products.models import Product
 
 
 class Unit(SQLModel, table=True):
@@ -23,6 +22,5 @@ class Unit(SQLModel, table=True):
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP(timezone=True), default=get_utc_now))
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP(timezone=True), default=get_utc_now))
 
-    products: list["Product"] = Relationship(back_populates="unit")
     inventory_items: list["Inventory"] = Relationship(back_populates="unit")
     orders: list["Order"] = Relationship(back_populates="unit")
