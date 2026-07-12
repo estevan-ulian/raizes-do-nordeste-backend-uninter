@@ -181,6 +181,7 @@ pyrightconfig.json
 # Miscellaneous
 .serena
 temp
+.DS_Store
 
 # Celery
 celerybeat-schedule
