@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.auth.dependencies import RoleChecker
@@ -17,6 +17,7 @@ from src.loyalty.schemas import (
 )
 from src.loyalty.service import loyalty_service
 from src.schemas import SuccessSchema
+from src.utils import get_request_ip
 
 router = APIRouter(prefix="/loyalty", tags=["loyalty"])
 customer_role_checker = RoleChecker(allowed_roles=[Role.CUSTOMER])
@@ -41,11 +42,14 @@ AUTHORIZATION_OPENAPI_EXTRA = {
     openapi_extra=AUTHORIZATION_OPENAPI_EXTRA,
 )
 async def get_my_loyalty_account(
+    request: Request,
     session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(customer_role_checker),
 ):
     """Return the loyalty account for the authenticated customer."""
-    account = await loyalty_service.get_or_create_account(current_user.id, session)
+    account = await loyalty_service.get_or_create_account(
+        current_user.id, session, actor_id=current_user.id, ip=get_request_ip(request)
+    )
     await session.commit()
     return SuccessSchema(message="Conta de fidelidade obtida com sucesso.", result=account)
 
@@ -63,11 +67,17 @@ async def get_my_loyalty_account(
 )
 async def create_redemption(
     redemption_data: LoyaltyRedemptionCreate,
+    request: Request,
     session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(customer_role_checker),
 ):
     """Redeem loyalty points for a reward."""
     redemption = await loyalty_service.redeem_points(
-        current_user.id, redemption_data.points_used, redemption_data.reward, session
+        current_user.id,
+        redemption_data.points_used,
+        redemption_data.reward,
+        session,
+        actor_id=current_user.id,
+        ip=get_request_ip(request),
     )
     return SuccessSchema(message="Resgate de fidelidade realizado com sucesso.", result=redemption)

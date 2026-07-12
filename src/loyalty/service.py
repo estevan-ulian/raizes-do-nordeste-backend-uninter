@@ -4,6 +4,7 @@ from decimal import Decimal
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.audit.service import AuditAction, audit_service
 from src.loyalty.exceptions import (
     LoyaltyAccountNotFoundException,
     LoyaltyInsufficientPointsException,
@@ -18,7 +19,13 @@ MARKETING_LOYALTY_PURPOSE = "MARKETING_AND_LOYALTY"
 class LoyaltyService:
     """Minimal loyalty service: accumulate points on approved payments."""
 
-    async def get_or_create_account(self, customer_id: uuid.UUID, session: AsyncSession) -> LoyaltyAccount:
+    async def get_or_create_account(
+        self,
+        customer_id: uuid.UUID,
+        session: AsyncSession,
+        actor_id: uuid.UUID | None = None,
+        ip: str | None = None,
+    ) -> LoyaltyAccount:
         account = await self.get_account(customer_id, session)
         if account is not None:
             return account
@@ -30,6 +37,19 @@ class LoyaltyService:
         )
         session.add(account)
         await session.flush()
+        await audit_service.register(
+            session,
+            action=AuditAction.LOYALTY_ACCOUNT_CREATED,
+            resource="loyalty_account",
+            resource_id=account.id,
+            user_id=actor_id or customer_id,
+            details={
+                "customer_id": str(customer_id),
+                "consent_granted": consent_granted,
+                "points_balance": account.points_balance,
+            },
+            ip=ip,
+        )
         return account
 
     async def get_account(self, customer_id: uuid.UUID, session: AsyncSession) -> LoyaltyAccount | None:
@@ -38,7 +58,12 @@ class LoyaltyService:
         return result.one_or_none()
 
     async def add_points(
-        self, customer_id: uuid.UUID, amount: Decimal, session: AsyncSession
+        self,
+        customer_id: uuid.UUID,
+        amount: Decimal,
+        session: AsyncSession,
+        actor_id: uuid.UUID | None = None,
+        ip: str | None = None,
     ) -> LoyaltyAccount | None:
         """Accumulate loyalty points for a paid order.
 
@@ -46,7 +71,7 @@ class LoyaltyService:
         marketing/loyalty consent. Returns the updated account, or None when
         no consent was granted (points are not accumulated in that case).
         """
-        account = await self.get_or_create_account(customer_id, session)
+        account = await self.get_or_create_account(customer_id, session, actor_id=actor_id, ip=ip)
         if not account.consent_granted:
             return None
         points = self._points_for_amount(amount)
@@ -62,6 +87,8 @@ class LoyaltyService:
         points_used: int,
         reward: str,
         session: AsyncSession,
+        actor_id: uuid.UUID | None = None,
+        ip: str | None = None,
     ) -> LoyaltyRedemption:
         account = await self.get_account(customer_id, session)
         if account is None:
@@ -78,6 +105,21 @@ class LoyaltyService:
         )
         session.add(redemption)
         await session.flush()
+        await audit_service.register(
+            session,
+            action=AuditAction.LOYALTY_REDEMPTION_CREATED,
+            resource="loyalty_redemption",
+            resource_id=redemption.id,
+            user_id=actor_id or customer_id,
+            details={
+                "loyalty_account_id": str(account.id),
+                "customer_id": str(customer_id),
+                "points_used": points_used,
+                "reward": reward,
+                "remaining_points": account.points_balance,
+            },
+            ip=ip,
+        )
         await session.commit()
         await session.refresh(redemption)
         return redemption
