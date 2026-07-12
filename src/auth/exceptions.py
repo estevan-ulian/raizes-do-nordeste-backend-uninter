@@ -36,6 +36,22 @@ class AccountNotVerifiedException(AppException):
     error_code = ErrorCode.USER_NOT_VERIFIED
 
 
+class AccountInactiveException(AppException):
+    """User's account is inactive."""
+
+    status_code = status.HTTP_403_FORBIDDEN
+    message = "Sua conta está inativa. Entre em contato com o administrador."
+    error_code = ErrorCode.USER_INACTIVE
+
+
+class AdminStatusConflictException(AppException):
+    """An administrator status change would leave the system unmanaged."""
+
+    status_code = status.HTTP_409_CONFLICT
+    message = "Não é possível desativar o próprio usuário ou o último administrador ativo."
+    error_code = ErrorCode.ADMIN_STATUS_CONFLICT
+
+
 class PasswordsDoNotMatchException(AppException):
     """As senhas não coincidem."""
 
@@ -96,6 +112,8 @@ def register_auth_exception_handlers(app: FastAPI):
     """Register all auth-related exception handlers."""
     exceptions = [
         AccessTokenRequiredException,
+        AccountInactiveException,
+        AdminStatusConflictException,
         AccountNotVerifiedException,
         InvalidCredentials,
         InvalidTokenException,

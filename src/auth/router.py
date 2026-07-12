@@ -1,11 +1,14 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.audit.service import AuditAction, audit_service
 from src.auth.dependencies import AccessTokenBearer, RefreshTokenBearer, RoleChecker, get_current_user
 from src.auth.exceptions import (
+    AccountInactiveException,
+    AdminStatusConflictException,
     InsufficientPermissionException,
     InvalidCredentials,
     InvalidTokenException,
@@ -23,8 +26,11 @@ from src.auth.schemas import (
     PasswordResetRequestSchema,
     TokenResponse,
     UserCreate,
+    UserListResponse,
     UserRegister,
     UserResponse,
+    UserSelfUpdate,
+    UserStatusUpdate,
 )
 from src.auth.service import UserService
 from src.database import get_async_session
@@ -45,7 +51,7 @@ from src.security import (
 )
 from src.templates.user_request_reset_password import generate_user_request_reset_password_template
 from src.templates.user_verify_email import generate_user_verify_email_template
-from src.utils import get_utc_now
+from src.utils import get_request_ip, get_utc_now
 from src.worker import send_mail
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -56,6 +62,8 @@ ROLE_CREATION_PERMISSIONS: dict[Role, list[Role]] = {
     Role.MANAGER: [Role.KITCHEN, Role.SERVER],  # MANAGER can only create KITCHEN and SERVER users
 }
 create_user_role_checker = RoleChecker(allowed_roles=[Role.ADMIN, Role.MANAGER])
+list_users_role_checker = RoleChecker(allowed_roles=[Role.ADMIN])
+manage_user_status_role_checker = RoleChecker(allowed_roles=[Role.ADMIN])
 
 REFRESH_ACCESS_TOKEN_EXPIRY_DAYS = 7
 
@@ -79,6 +87,7 @@ REFRESH_ACCESS_TOKEN_EXPIRY_DAYS = 7
 )
 async def create_user(
     user_data: UserCreate,
+    request: Request,
     session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(create_user_role_checker),
 ):
@@ -92,6 +101,20 @@ async def create_user(
     if user_exists:
         raise UserAlreadyExistsException()
     new_user = await user_service.create_user(user_data, session, role=user_data.role)
+    await audit_service.register(
+        session,
+        action=AuditAction.USER_CREATED,
+        resource="user",
+        resource_id=new_user.id,
+        user_id=current_user.id,
+        details={
+            "created_user_id": str(new_user.id),
+            "created_role": new_user.role.value,
+            "actor_role": current_user.role.value,
+        },
+        ip=get_request_ip(request),
+    )
+    await session.commit()
     token = create_url_safe_token(
         {
             "email": new_user.email,
@@ -108,13 +131,97 @@ async def create_user(
     return SuccessSchema(message="Usuário criado com sucesso.", result=new_user)
 
 
+@router.get(
+    "/users",
+    response_model=SuccessSchema[UserListResponse],
+    responses=error_responses(InsufficientPermissionException),
+    status_code=status.HTTP_200_OK,
+    openapi_extra={
+        "parameters": [
+            {
+                "name": "Authorization",
+                "in": "header",
+                "required": True,
+                "description": "The access token to use for authentication.",
+                "schema": {"type": "string", "example": "Bearer eyJhbGciOiJIUzI1NiIs..."},
+            }
+        ]
+    },
+)
+async def list_users(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    session: AsyncSession = Depends(get_async_session),
+    _current_user: User = Depends(list_users_role_checker),
+):
+    """List users. Requires ADMIN role."""
+    users, total = await user_service.list_users(session, page=page, limit=limit)
+    result = UserListResponse(items=users, total=total, page=page, limit=limit)
+    return SuccessSchema(message="Usuários obtidos com sucesso.", result=result)
+
+
+@router.patch(
+    "/users/{user_id}/status",
+    response_model=SuccessSchema[UserResponse],
+    responses=error_responses(
+        AdminStatusConflictException, InsufficientPermissionException, UserNotFoundException
+    ),
+    status_code=status.HTTP_200_OK,
+    openapi_extra={
+        "parameters": [
+            {
+                "name": "Authorization",
+                "in": "header",
+                "required": True,
+                "description": "The access token to use for authentication.",
+                "schema": {"type": "string", "example": "Bearer eyJhbGciOiJIUzI1NiIs..."},
+            }
+        ]
+    },
+)
+async def update_user_status(
+    user_id: uuid.UUID,
+    status_data: UserStatusUpdate,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(manage_user_status_role_checker),
+):
+    """Activate or deactivate a user. Requires ADMIN role."""
+    user = await user_service.get_user_by_id(user_id, session)
+    if not user:
+        raise UserNotFoundException()
+    if not status_data.is_active and user.role == Role.ADMIN:
+        if user.id == current_user.id or not await user_service.has_other_active_admin(user.id, session):
+            raise AdminStatusConflictException()
+    updated_user = await user_service.update_user({"is_active": status_data.is_active}, user, session)
+    await audit_service.register(
+        session,
+        action=(AuditAction.USER_ACTIVATED if status_data.is_active else AuditAction.USER_DEACTIVATED),
+        resource="user",
+        resource_id=updated_user.id,
+        user_id=current_user.id,
+        details={
+            "target_user_id": str(updated_user.id),
+            "is_active": updated_user.is_active,
+            "actor_role": current_user.role.value,
+        },
+        ip=get_request_ip(request),
+    )
+    await session.commit()
+    return SuccessSchema(message="Status do usuário atualizado com sucesso.", result=updated_user)
+
+
 @router.post(
     "/register",
     response_model=SuccessSchema[UserResponse],
     status_code=status.HTTP_201_CREATED,
     responses=error_responses(UserAlreadyExistsException, PrivacyConsentRequiredException),
 )
-async def register(user_data: UserRegister, session: AsyncSession = Depends(get_async_session)):
+async def register(
+    user_data: UserRegister,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+):
     """Public route for CUSTOMER registration."""
     if not user_data.privacy_consent:
         raise PrivacyConsentRequiredException()
@@ -122,7 +229,26 @@ async def register(user_data: UserRegister, session: AsyncSession = Depends(get_
     if user_exists:
         raise UserAlreadyExistsException()
     new_user = await user_service.create_user(user_data, session, role=Role.CUSTOMER)
-    await privacy_service.register_account_consents(new_user.id, user_data.marketing_consent, session)
+    await privacy_service.register_account_consents(
+        new_user.id,
+        user_data.marketing_consent,
+        session,
+        actor_id=new_user.id,
+        ip=get_request_ip(request),
+    )
+    await audit_service.register(
+        session,
+        action=AuditAction.USER_REGISTERED,
+        resource="user",
+        resource_id=new_user.id,
+        user_id=new_user.id,
+        details={
+            "role": new_user.role.value,
+            "privacy_consent": user_data.privacy_consent,
+            "marketing_consent": user_data.marketing_consent,
+        },
+        ip=get_request_ip(request),
+    )
     await session.commit()
     token = create_url_safe_token(
         {
@@ -146,7 +272,11 @@ async def register(user_data: UserRegister, session: AsyncSession = Depends(get_
     response_model=SuccessSchema[None],
     responses=error_responses(InvalidTokenException, UserNotFoundException),
 )
-async def verify_email(token: str, session: AsyncSession = Depends(get_async_session)):
+async def verify_email(
+    token: str,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+):
     """Verify a user's email address after registration."""
     token_data = decode_url_safe_token(token)
     if not token_data:
@@ -158,8 +288,18 @@ async def verify_email(token: str, session: AsyncSession = Depends(get_async_ses
     if not user:
         raise UserNotFoundException()
     if user.is_verified:
-        return SuccessSchema(message="Email já verificado.", success=False, result=None)
+        return SuccessSchema(message="E-mail já verificado.", result=None)
     await user_service.update_user({"is_verified": True}, user, session)
+    await audit_service.register(
+        session,
+        action=AuditAction.USER_EMAIL_VERIFIED,
+        resource="user",
+        resource_id=user.id,
+        user_id=user.id,
+        details={"is_verified": True},
+        ip=get_request_ip(request),
+    )
+    await session.commit()
     return SuccessSchema(message="Email verificado com sucesso.", result=None)
 
 
@@ -168,13 +308,19 @@ async def verify_email(token: str, session: AsyncSession = Depends(get_async_ses
     response_model=SuccessSchema[TokenResponse],
     responses=error_responses(InvalidCredentials),
 )
-async def login(login_data: LoginRequest, session: AsyncSession = Depends(get_async_session)):
+async def login(
+    login_data: LoginRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+):
     """Authenticate a user with email and password."""
     email = login_data.email
     password = login_data.password
     user = await user_service.get_user_by_email(email, session)
     if not user:
         raise InvalidCredentials()
+    if not user.is_active:
+        raise AccountInactiveException()
     password_valid = verify_password(password, user.password_hash)
     if not password_valid:
         raise InvalidCredentials()
@@ -186,6 +332,16 @@ async def login(login_data: LoginRequest, session: AsyncSession = Depends(get_as
         refresh=True,
         expiry=timedelta(days=REFRESH_ACCESS_TOKEN_EXPIRY_DAYS),
     )
+    await audit_service.register(
+        session,
+        action=AuditAction.USER_LOGIN,
+        resource="auth",
+        resource_id=user.id,
+        user_id=user.id,
+        details={"role": user.role.value},
+        ip=get_request_ip(request),
+    )
+    await session.commit()
     return SuccessSchema(
         message="Autenticado com sucesso!",
         result={
@@ -200,7 +356,9 @@ async def login(login_data: LoginRequest, session: AsyncSession = Depends(get_as
     "/refresh",
     status_code=status.HTTP_200_OK,
     response_model=SuccessSchema[TokenResponse],
-    responses=error_responses(UserSessionExpiredException, UserNotFoundException),
+    responses=error_responses(
+        AccountInactiveException, UserSessionExpiredException, UserNotFoundException
+    ),
     openapi_extra={
         "parameters": [
             {
@@ -214,7 +372,9 @@ async def login(login_data: LoginRequest, session: AsyncSession = Depends(get_as
     },
 )
 async def refresh(
-    token_details: dict = Depends(RefreshTokenBearer()), session: AsyncSession = Depends(get_async_session)
+    request: Request,
+    token_details: dict = Depends(RefreshTokenBearer()),
+    session: AsyncSession = Depends(get_async_session),
 ):
     """Refresh the authentication token."""
     expiry_timestamp = token_details["exp"]
@@ -225,6 +385,8 @@ async def refresh(
     user = await user_service.get_user_by_email(user_email, session)
     if not user:
         raise UserNotFoundException()
+    if not user.is_active:
+        raise AccountInactiveException()
 
     old_refresh_jti = token_details["jti"]
     await add_jti_to_blocklist(old_refresh_jti)
@@ -235,6 +397,16 @@ async def refresh(
         refresh=True,
         expiry=timedelta(days=REFRESH_ACCESS_TOKEN_EXPIRY_DAYS),
     )
+    await audit_service.register(
+        session,
+        action=AuditAction.USER_TOKEN_REFRESHED,
+        resource="auth",
+        resource_id=user.id,
+        user_id=user.id,
+        details={"old_refresh_token_revoked": True},
+        ip=get_request_ip(request),
+    )
+    await session.commit()
     return SuccessSchema(
         message="Token atualizado com sucesso!",
         result={
@@ -265,15 +437,75 @@ async def me(user: User = Depends(get_current_user)):
     return SuccessSchema(message="Dados do usuário obtidos com sucesso!", result=user)
 
 
+@router.patch(
+    "/me",
+    response_model=SuccessSchema[UserResponse],
+    status_code=status.HTTP_200_OK,
+    openapi_extra={
+        "parameters": [
+            {
+                "name": "Authorization",
+                "in": "header",
+                "required": True,
+                "description": "The access token to use for authentication.",
+                "schema": {"type": "string", "example": "Bearer eyJhbGciOiJIUzI1NiIs..."},
+            }
+        ]
+    },
+)
+async def update_me(
+    data: UserSelfUpdate,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Update the authenticated user's own profile data."""
+    update_data = data.model_dump(exclude_unset=True)
+    updated_user = await user_service.update_user(update_data, current_user, session)
+    await audit_service.register(
+        session,
+        action=AuditAction.USER_UPDATED,
+        resource="user",
+        resource_id=updated_user.id,
+        user_id=updated_user.id,
+        details={"changed_fields": list(update_data.keys())},
+        ip=get_request_ip(request),
+    )
+    await session.commit()
+    return SuccessSchema(message="Dados do usuário atualizados com sucesso.", result=updated_user)
+
+
 @router.post("/logout", status_code=status.HTTP_200_OK, response_model=SuccessSchema[None])
-async def logout(logout_data: LogoutRequest, token_details: dict = Depends(AccessTokenBearer())):
+async def logout(
+    logout_data: LogoutRequest,
+    request: Request,
+    token_details: dict = Depends(AccessTokenBearer()),
+    session: AsyncSession = Depends(get_async_session),
+):
     """Logout the authenticated user."""
     jti = token_details["jti"]
     await add_jti_to_blocklist(jti)
     refresh_token_data = decode_token(logout_data.refresh_token)
-    if refresh_token_data and refresh_token_data["refresh"]:
+    refresh_token_revoked = bool(refresh_token_data and refresh_token_data.get("refresh"))
+    if refresh_token_revoked:
         refresh_jti = refresh_token_data["jti"]
         await add_jti_to_blocklist(refresh_jti)
+    user_data = token_details.get("user", {})
+    user_id = user_data.get("user_id")
+    try:
+        parsed_user_id = uuid.UUID(user_id) if user_id else None
+    except ValueError:
+        parsed_user_id = None
+    await audit_service.register(
+        session,
+        action=AuditAction.USER_LOGOUT,
+        resource="auth",
+        resource_id=parsed_user_id,
+        user_id=parsed_user_id,
+        details={"refresh_token_revoked": refresh_token_revoked},
+        ip=get_request_ip(request),
+    )
+    await session.commit()
     return SuccessSchema(message="Logout realizado com sucesso!", result=None)
 
 
@@ -281,7 +513,9 @@ async def logout(logout_data: LogoutRequest, token_details: dict = Depends(Acces
     "/reset_password", response_model=SuccessSchema[None], responses=error_responses(UserNotFoundException)
 )
 async def reset_password(
-    reset_data: PasswordResetRequestSchema, session: AsyncSession = Depends(get_async_session)
+    reset_data: PasswordResetRequestSchema,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
 ):
     """Request a password reset with the given email."""
     email = reset_data.email
@@ -300,6 +534,16 @@ async def reset_password(
             subject="Redefinição de senha",
             body=html_message,
         )
+        await audit_service.register(
+            session,
+            action=AuditAction.PASSWORD_RESET_REQUESTED,
+            resource="auth",
+            resource_id=user.id,
+            user_id=user.id,
+            details={"reset_email_sent": True},
+            ip=get_request_ip(request),
+        )
+        await session.commit()
     # Always return success, even if the email was not sent (e.g., user not found).
     # Prevents leaking information about the existence of the user.
     return SuccessSchema(message="E-mail de redefinição de senha enviado com sucesso!", result=None)
@@ -311,7 +555,9 @@ async def reset_password(
     responses=error_responses(PasswordsDoNotMatchException, InvalidTokenException, UserNotFoundException),
 )
 async def reset_password_confirm(
-    reset_password_data: PasswordResetConfirmSchema, session: AsyncSession = Depends(get_async_session)
+    reset_password_data: PasswordResetConfirmSchema,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
 ):
     """Reset the password using the given token and new password."""
     new_password = reset_password_data.password
@@ -336,4 +582,14 @@ async def reset_password_confirm(
 
     if token_id:
         await add_reset_token_to_blocklist(str(token_id))
+    await audit_service.register(
+        session,
+        action=AuditAction.PASSWORD_RESET_CONFIRMED,
+        resource="auth",
+        resource_id=user.id,
+        user_id=user.id,
+        details={"reset_token_revoked": bool(token_id)},
+        ip=get_request_ip(request),
+    )
+    await session.commit()
     return SuccessSchema(message="Senha redefinida com sucesso!", result=None)

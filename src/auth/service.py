@@ -1,7 +1,10 @@
-from sqlmodel import select
+from uuid import UUID
+
+from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.security import generate_password_hash
+from src.utils import get_utc_now
 
 from .models import Role, User
 from .schemas import UserCreate, UserRegister
@@ -14,9 +17,30 @@ class UserService:
         result = await session.exec(statement)
         return result.one_or_none()
 
+    async def get_user_by_id(self, user_id: UUID, session: AsyncSession) -> User | None:
+        """Get a user by id. Returns None if not found."""
+        statement = select(User).where(User.id == user_id)
+        result = await session.exec(statement)
+        return result.one_or_none()
+
     async def user_already_exists(self, email: str, session: AsyncSession) -> bool:
         """Check if a user with the email already exists."""
         return await self.get_user_by_email(email, session) is not None
+
+    async def list_users(
+        self,
+        session: AsyncSession,
+        page: int = 1,
+        limit: int = 20,
+    ) -> tuple[list[User], int]:
+        """List users with pagination."""
+        total_statement = select(func.count(User.id))
+        total_result = await session.exec(total_statement)
+        total = total_result.one()
+
+        statement = select(User).order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit)
+        result = await session.exec(statement)
+        return list(result.all()), total
 
     async def create_user(
         self, user_data: UserCreate | UserRegister | dict, session: AsyncSession, role: Role = Role.CUSTOMER
@@ -35,13 +59,26 @@ class UserService:
         new_user.password_hash = generate_password_hash(password)
         new_user.role = role
         session.add(new_user)
-        await session.commit()
+        await session.flush()
         await session.refresh(new_user)
         return new_user
 
     async def update_user(self, user_data: dict, user: User, session: AsyncSession):
         for key, value in user_data.items():
             setattr(user, key, value)
-        await session.commit()
+        user.updated_at = get_utc_now()
+        await session.flush()
         await session.refresh(user)
         return user
+
+    async def has_other_active_admin(
+        self, user_id: UUID, session: AsyncSession
+    ) -> bool:
+        """Lock active admins and report whether another one remains."""
+        statement = (
+            select(User)
+            .where(User.role == Role.ADMIN, User.is_active)
+            .with_for_update()
+        )
+        result = await session.exec(statement)
+        return any(admin.id != user_id for admin in result.all())

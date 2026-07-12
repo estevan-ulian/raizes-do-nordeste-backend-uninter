@@ -33,6 +33,19 @@ class UserCreate(BaseModel):
     role: Role
 
 
+class UserSelfUpdate(BaseModel):
+    """Schema for users updating their own profile data."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    phone: Optional[str] = Field(default=None, max_length=20)
+
+
+class UserStatusUpdate(BaseModel):
+    """Schema for administrative user activation/deactivation."""
+
+    is_active: bool
+
+
 class UserResponse(BaseModel):
     """Schema for user data returned in responses. Does not include password hash."""
 
@@ -42,7 +55,19 @@ class UserResponse(BaseModel):
     phone: Optional[str] = None
     role: Role
     is_verified: bool
+    is_active: bool
     created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserListResponse(BaseModel):
+    """Schema for paginated user lists."""
+
+    items: list[UserResponse]
+    total: int
+    page: int
+    limit: int
 
     model_config = ConfigDict(from_attributes=True)
 

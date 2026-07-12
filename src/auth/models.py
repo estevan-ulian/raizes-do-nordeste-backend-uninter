@@ -34,6 +34,7 @@ class User(SQLModel, table=True):
     phone: str | None = Field(max_length=20, default=None)
     role: Role = Field(default=Role.CUSTOMER, sa_type=SQLEnum(Role))
     is_verified: bool = Field(default=False)
+    is_active: bool = Field(default=True)
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP(timezone=True), default=get_utc_now))
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP(timezone=True), default=get_utc_now))
 

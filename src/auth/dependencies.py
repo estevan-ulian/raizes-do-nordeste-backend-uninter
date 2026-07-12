@@ -10,6 +10,7 @@ from src.security import decode_token, token_in_blocklist
 
 from .exceptions import (
     AccessTokenRequiredException,
+    AccountInactiveException,
     AccountNotVerifiedException,
     InsufficientPermissionException,
     InvalidTokenException,
@@ -26,6 +27,8 @@ class TokenBearer(HTTPBearer):
 
     async def __call__(self, request: Request) -> dict | None:
         creds = await super().__call__(request)
+        if creds is None:
+            return None
         token = creds.credentials
         token_data = decode_token(token)
         if token_data is None:
@@ -58,6 +61,23 @@ async def get_current_user(
     user = await user_service.get_user_by_email(user_email, session)
     if not user:
         raise UserNotFoundException()
+    if not user.is_active:
+        raise AccountInactiveException()
+    return user
+
+
+async def get_optional_current_user(
+    token_details: dict | None = Depends(AccessTokenBearer(auto_error=False)),
+    session: AsyncSession = Depends(get_async_session),
+) -> User | None:
+    if token_details is None:
+        return None
+    user_email = token_details["user"]["email"]
+    user = await user_service.get_user_by_email(user_email, session)
+    if not user:
+        raise UserNotFoundException()
+    if not user.is_active:
+        raise AccountInactiveException()
     return user
 
 
