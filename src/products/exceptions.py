@@ -12,6 +12,22 @@ class ProductNotFoundException(AppException):
     error_code = ErrorCode.NOT_FOUND
 
 
+class ProductCategoryAlreadyExistsException(AppException):
+    """Product category already exists."""
+
+    status_code = status.HTTP_409_CONFLICT
+    message = "Já existe uma categoria de produto com este nome."
+    error_code = ErrorCode.PRODUCT_CATEGORY_ALREADY_EXISTS
+
+
+class ProductCategoryNotFoundException(AppException):
+    """Product category was not found."""
+
+    status_code = status.HTTP_404_NOT_FOUND
+    message = "Categoria de produto não encontrada."
+    error_code = ErrorCode.PRODUCT_CATEGORY_NOT_FOUND
+
+
 class ProductImageInvalidException(AppException):
     """Product image has an invalid format."""
 
@@ -30,6 +46,12 @@ class ProductImageTooLargeException(AppException):
 
 def register_products_exception_handlers(app: FastAPI):
     """Register all products-related exception handlers."""
-    exceptions = [ProductImageInvalidException, ProductImageTooLargeException, ProductNotFoundException]
+    exceptions = [
+        ProductCategoryAlreadyExistsException,
+        ProductCategoryNotFoundException,
+        ProductImageInvalidException,
+        ProductImageTooLargeException,
+        ProductNotFoundException,
+    ]
     for exc_class in exceptions:
         app.add_exception_handler(exc_class, create_exception_handler(exc_class))
