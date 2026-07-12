@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
 fastapi_config = {
     "title": "Raízes do Nordeste - Backend",
     "description": "Backend para o projeto Raízes do Nordeste.",
-    "root_path": "/api",
+    "root_path": config.API_ROOT_PATH,
     "redoc_url": "/redoc",
     "docs_url": "/docs",
     "version": "0.1.0",

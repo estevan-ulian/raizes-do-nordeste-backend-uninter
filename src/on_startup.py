@@ -29,4 +29,5 @@ async def create_first_admin_if_not_exists() -> None:
             "is_verified": True,
         }
         admin = await service.create_user(user_data, session, role=Role.ADMIN)
+        await session.commit()
         print(f"First admin user created — email: {admin.email}, id: {admin.id}")

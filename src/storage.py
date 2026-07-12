@@ -75,4 +75,7 @@ class LocalStorage:
         return stem or "product"
 
 
-storage = LocalStorage(base_dir=str(config.UPLOAD_PATH), public_base_url=config.UPLOAD_PUBLIC_URL)
+storage = LocalStorage(
+    base_dir=str(config.UPLOAD_PATH),
+    public_base_url=config.EFFECTIVE_UPLOAD_PUBLIC_URL,
+)

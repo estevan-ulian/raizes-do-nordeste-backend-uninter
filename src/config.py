@@ -35,6 +35,7 @@ class AppConfig(BaseSettings):
     USE_CREDENTIALS: bool = False
     VALIDATE_CERTS: bool = True
 
+    API_ROOT_PATH: str = "/api"
     UPLOAD_DIR: str = "static/uploads"
     UPLOAD_PUBLIC_URL: str = "/uploads"
 
@@ -44,6 +45,14 @@ class AppConfig(BaseSettings):
         if not upload_path.is_absolute():
             upload_path = BASE_DIR / upload_path
         return upload_path
+
+    @property
+    def EFFECTIVE_UPLOAD_PUBLIC_URL(self) -> str:
+        public_url = self.UPLOAD_PUBLIC_URL.rstrip("/") or "/uploads"
+        root_path = self.API_ROOT_PATH.rstrip("/")
+        if root_path and public_url.startswith("/") and not public_url.startswith(f"{root_path}/"):
+            return f"{root_path}{public_url}"
+        return public_url
 
     @property
     def DATABASE_URL(self) -> str:
